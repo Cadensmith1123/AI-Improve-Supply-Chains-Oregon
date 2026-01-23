@@ -29,18 +29,27 @@ BEGIN
         p.name AS product_name,
         mi.quantity_loaded,
         mi.snapshot_unit_weight AS unit_weight_lbs,
-        mi.snapshot_cost_per_item AS cost_per_item,
         mi.snapshot_items_per_unit AS items_per_unit,
+        
+        -- UNIT ECONOMICS (Cost vs. Price)
+        mi.snapshot_cost_per_item AS cost_per_item,
+        mi.snapshot_price_per_item AS price_per_item, -- NEW: The frozen sale price
         
         -- CALCULATED TOTALS (For Quick Verification)
         (mi.quantity_loaded * mi.snapshot_unit_weight) AS total_line_weight_lbs,
-        (mi.quantity_loaded * mi.snapshot_items_per_unit * mi.snapshot_cost_per_item) AS total_line_cogs
+        
+        -- Total Cost of Goods Sold (Expenses)
+        (mi.quantity_loaded * mi.snapshot_items_per_unit * mi.snapshot_cost_per_item) AS total_line_cogs,
+        
+        -- Total Revenue (Income) - NEW
+        -- Returns NULL if this is just a transfer (no sale price)
+        (mi.quantity_loaded * mi.snapshot_items_per_unit * mi.snapshot_price_per_item) AS total_line_revenue
 
     FROM scenarios s
     JOIN routes r ON s.route_id = r.route_id
     JOIN vehicles v ON s.vehicle_id = v.vehicle_id
     JOIN drivers d ON s.driver_id = d.driver_id
-    -- LEFT JOIN in case we created a trip but haven't added items yet
+    -- LEFT JOIN manifest items
     LEFT JOIN manifest_items mi ON s.scenario_id = mi.scenario_id
     LEFT JOIN supply sup ON mi.supply_id = sup.supply_id
     LEFT JOIN products_master p ON sup.product_code = p.product_code

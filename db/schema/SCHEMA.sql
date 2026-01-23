@@ -158,6 +158,7 @@ CREATE TABLE manifest_items (
     snapshot_cost_per_item DECIMAL(10,2) NOT NULL,
     snapshot_items_per_unit INT NOT NULL, 
     snapshot_unit_weight DECIMAL(8,2) NOT NULL,
+    snapshot_price_per_item DECIMAL(10,2) NOT NULL,
     
     FOREIGN KEY (scenario_id) REFERENCES scenarios(scenario_id) ON DELETE CASCADE,
     FOREIGN KEY (supply_id) REFERENCES supply(supply_id) ON DELETE RESTRICT,
