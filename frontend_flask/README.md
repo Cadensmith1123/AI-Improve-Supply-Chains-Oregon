@@ -8,3 +8,4 @@ python -m venv .venv
 .\.venv\Scripts\activate
 pip install flask
 python app.py
+should be live at http://127.0.0.1:5000/routes
