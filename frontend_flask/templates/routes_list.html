@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Routes</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; }
+    table { border-collapse: collapse; width: 100%; max-width: 1100px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background: #f5f5f5; }
+    a { color: #1D499B; text-decoration: none; font-weight: 600; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>Routes</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th>route_id</th>
+        <th>name</th>
+        <th>start (origin)</th>
+        <th>destination</th>
+        <th>sales_amount</th>
+        <th>actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for r in routes %}
+        <tr>
+          <td>{{ r.route_id }}</td>
+          <td>{{ r.name }}</td>
+          <td>{{ r.origin_name }} ({{ r.origin_location_id }})</td>
+          <td>{{ r.dest_name }} ({{ r.dest_location_id }})</td>
+          <td>
+            {% if r.sales_amount is not none %}
+              ${{ "%.2f"|format(r.sales_amount) }}
+            {% else %}
+              <em>Not set</em>
+            {% endif %}
+          </td>
+          <td>
+            <a href="/routes/{{ r.route_id }}/edit">Edit</a>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p style="margin-top: 16px;">
+    Health check: <a href="/health">/health</a>
+  </p>
+</body>
+</html>

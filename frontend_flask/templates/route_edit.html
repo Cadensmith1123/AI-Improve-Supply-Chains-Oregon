@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Edit Route</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; }
+    .card { max-width: 700px; border: 1px solid #ddd; padding: 16px; border-radius: 10px; }
+    .field { margin: 12px 0; }
+    label { display:block; font-weight:600; margin-bottom:6px; }
+    input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    .error-input { border-color: #b91c1c; background: #fff5f5; }
+    .error-text { color: #b91c1c; font-size: 12px; margin-top: 6px; }
+    .actions { display:flex; gap:10px; margin-top: 16px; }
+    button { padding: 10px 14px; border: 0; border-radius: 8px; background: #1D499B; color: white; cursor:pointer; }
+    a { display:inline-block; padding: 10px 14px; border-radius: 8px; border: 1px solid #ddd; text-decoration:none; color:#1D499B; }
+    .alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Edit Route #{{ route.route_id }}</h1>
+
+    {% if errors %}
+      <div class="alert">Please fix the highlighted fields.</div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('route_edit_post', route_id=route.route_id) }}" novalidate>
+      <div class="field">
+        <label for="name">Route Name (optional)</label>
+        <input id="name" name="name" value="{{ form_values.name }}">
+      </div>
+
+      <div class="field">
+        <label for="origin_location_id">Start (required)</label>
+        <select
+          id="origin_location_id"
+          name="origin_location_id"
+          class="{{ 'error-input' if errors.get('origin_location_id') else '' }}"
+        >
+          <option value="">-- Select start --</option>
+          {% for loc in locations %}
+            <option value="{{ loc.location_id }}"
+              {% if form_values.origin_location_id == (loc.location_id | string) %}selected{% endif %}
+            >
+              {{ loc.name }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if errors.get('origin_location_id') %}
+          <div class="error-text">{{ errors.get('origin_location_id') }}</div>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="dest_location_id">Destination (required)</label>
+        <select
+          id="dest_location_id"
+          name="dest_location_id"
+          class="{{ 'error-input' if errors.get('dest_location_id') else '' }}"
+        >
+          <option value="">-- Select destination --</option>
+          {% for loc in locations %}
+            <option value="{{ loc.location_id }}"
+              {% if form_values.dest_location_id == (loc.location_id | string) %}selected{% endif %}
+            >
+              {{ loc.name }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if errors.get('dest_location_id') %}
+          <div class="error-text">{{ errors.get('dest_location_id') }}</div>
+        {% endif %}
+      </div>
+
+      <div class="field">
+        <label for="sales_amount">Sales Amount (required, numeric)</label>
+        <input
+          id="sales_amount"
+          name="sales_amount"
+          placeholder="e.g., 1200.50"
+          value="{{ form_values.sales_amount }}"
+          class="{{ 'error-input' if errors.get('sales_amount') else '' }}"
+        >
+        {% if errors.get('sales_amount') %}
+          <div class="error-text">{{ errors.get('sales_amount') }}</div>
+        {% endif %}
+      </div>
+
+      <div class="actions">
+        <button type="submit">Save</button>
+        <a href="{{ url_for('routes_list') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>
