@@ -142,6 +142,8 @@ CREATE TABLE scenarios (
     actual_load_minutes INT DEFAULT NULL,
     actual_unload_minutes INT DEFAULT NULL,
     
+    snapshot_total_revenue DECIMAL(4,2) NOT NULL,
+    
     FOREIGN KEY (route_id) REFERENCES routes(route_id) ON DELETE SET NULL,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(vehicle_id) ON DELETE SET NULL,
     FOREIGN KEY (driver_id) REFERENCES drivers(driver_id) ON DELETE SET NULL
