@@ -60,7 +60,7 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/routes")
+@app.get("/routes/")
 def routes_list():
     routes = db.list_routes()
     locations = {l["location_id"]: l["name"] for l in db.list_locations()}
