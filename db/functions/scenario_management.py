@@ -1,5 +1,5 @@
-from .connect import get_db
-from .simple_functions import read, create, delete
+from db.functions.connect import get_db
+from db.functions.simple_functions import read, create, delete
 from decimal import Decimal #used to combat floating point errors
 import pandas as pd
 
