@@ -54,6 +54,8 @@ CREATE TABLE vehicles (
     depreciation_per_mile DECIMAL(10,2) NOT NULL,
     
     annual_insurance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    annual_maintenance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    
 
     max_weight_lbs INT NOT NULL,
     max_volume_cubic_ft INT NOT NULL,
