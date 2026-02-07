@@ -51,7 +51,7 @@ def _ids_arg(ids):
     return str(ids)
 
 
-def _call_view_proc(proc_name, columns=None, limit=None, ids=None):
+def _call_view_proc(proc_name, conn=get_db(), columns=None, limit=None, ids=None):
     """
     Helper to format proc calls then request data from MYSQL
     
@@ -60,7 +60,6 @@ def _call_view_proc(proc_name, columns=None, limit=None, ids=None):
     :param limit: number of records to return or none
     :param ids: list of ids or none
     """
-    conn = get_db()
     cur = conn.cursor(dictionary=True)
 
     cur.callproc(proc_name, [
@@ -77,41 +76,41 @@ def _call_view_proc(proc_name, columns=None, limit=None, ids=None):
     return rows
 
 
-def view_locations(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_locations", columns, limit, ids)
+def view_locations(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_locations", conn, columns, limit, ids)
 
 
-def view_products_master(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_products_master", columns, limit, ids)
+def view_products_master(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_products_master", conn, columns, limit, ids)
 
 
-def view_drivers(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_drivers", columns, limit, ids)
+def view_drivers(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_drivers", conn, columns, limit, ids)
 
 
-def view_vehicles(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_vehicles", columns, limit, ids)
+def view_vehicles(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_vehicles", conn, columns, limit, ids)
 
 
-def view_entities(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_entities", columns, limit, ids)
+def view_entities(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_entities", conn, columns, limit, ids)
 
 
-def view_supply(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_supply", columns, limit, ids)
+def view_supply(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_supply", conn, columns, limit, ids)
 
 
-def view_demand(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_demand", columns, limit, ids)
+def view_demand(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_demand", conn, columns, limit, ids)
 
 
-def view_routes(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_routes", columns, limit, ids)
+def view_routes(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_routes", conn, columns, limit, ids)
 
 
-def view_scenarios(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_scenarios", columns, limit, ids)
+def view_scenarios(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_scenarios", conn, columns, limit, ids)
 
 
-def view_manifest_items(columns=None, limit=None, ids=None):
-    return _call_view_proc("view_manifest_items", columns, limit, ids)
+def view_manifest_items(conn=get_db(), columns=None, limit=None, ids=None):
+    return _call_view_proc("view_manifest_items", conn, columns, limit, ids)

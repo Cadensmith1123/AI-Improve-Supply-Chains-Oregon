@@ -8,6 +8,7 @@ CREATE PROCEDURE create_trip_header(
     IN p_driver_id INT,
     IN p_run_date DATE,
     IN p_current_gas_price DECIMAL(4,2),
+    IN p_total_revenue DECIMAL(12,2),
     OUT p_new_scenario_id INT -- Returns ID so Python can add items
 )
 BEGIN
@@ -40,12 +41,14 @@ BEGIN
         route_id, vehicle_id, driver_id, run_date,
         snapshot_driver_wage, snapshot_driver_load_wage,
         snapshot_vehicle_mpg, snapshot_gas_price, snapshot_daily_insurance,
-        snapshot_planned_load_minutes, snapshot_planned_unload_minutes
+        snapshot_planned_load_minutes, snapshot_planned_unload_minutes,
+        snapshot_total_revenue
     ) VALUES (
         p_route_id, p_vehicle_id, p_driver_id, p_run_date,
         v_driver_wage, v_driver_load_wage,
         v_vehicle_mpg, p_current_gas_price, (v_annual_insurance / 365.0),
-        v_load_time, v_unload_time
+        v_load_time, v_unload_time,
+        p_total_revenue
     );
 
     SET p_new_scenario_id = LAST_INSERT_ID();

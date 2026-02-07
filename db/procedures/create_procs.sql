@@ -170,11 +170,15 @@ BEGIN
     SELECT LAST_INSERT_ID() AS new_id;
 END $$
 
-DROP PROCEDURE IF EXISTS add_manifest_item $$
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS add_manifest_item$$
+
 CREATE PROCEDURE add_manifest_item(
     IN p_scenario_id INT,
     IN p_supply_id INT,
     IN p_demand_id INT,
+    IN p_item_name VARCHAR(100),
     IN p_quantity_loaded DECIMAL(10,2),
     IN p_snapshot_cost_per_item DECIMAL(10,2),
     IN p_snapshot_items_per_unit INT,
@@ -183,18 +187,22 @@ CREATE PROCEDURE add_manifest_item(
 )
 BEGIN
     INSERT INTO manifest_items (
-        scenario_id, supply_id, demand_id,
+        scenario_id, supply_id, demand_id, item_name,
         quantity_loaded,
         snapshot_cost_per_item, snapshot_items_per_unit,
         snapshot_unit_weight, snapshot_price_per_item
     )
     VALUES (
-        p_scenario_id, p_supply_id, p_demand_id,
+        p_scenario_id, 
+        p_supply_id, 
+        p_demand_id,
+        p_item_name,
         p_quantity_loaded,
         p_snapshot_cost_per_item, p_snapshot_items_per_unit,
         p_snapshot_unit_weight, p_snapshot_price_per_item
     );
     SELECT LAST_INSERT_ID() AS new_id;
-END $$
+END$$
+
 
 DELIMITER ;
