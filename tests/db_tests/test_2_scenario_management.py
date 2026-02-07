@@ -90,7 +90,6 @@ def test_create_scenario(connection, dependencies):
 
     # Cleanup
     delete.delete_plan(new_id, conn=connection)
-    connection.commit()
 
 
 def test_update_scenario(connection, dependencies):
@@ -121,7 +120,6 @@ def test_update_scenario(connection, dependencies):
     
     # Cleanup
     delete.delete_plan(scenario_id, conn=connection)
-    connection.commit()
 
 
 def test_add_manifest_items(connection, dependencies):
@@ -165,7 +163,6 @@ def test_add_manifest_items(connection, dependencies):
     
     # Cleanup
     delete.delete_plan(scenario_id, conn=connection)
-    connection.commit()
 
 
 def test_delete_scenario(connection, dependencies):
