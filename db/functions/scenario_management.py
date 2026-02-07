@@ -194,10 +194,14 @@ def add_manifest_items(
     cur = conn.cursor()
 
     cur.callproc("add_manifest_item", args)
+    
+    for r in cur.stored_results():
+        new_id = r.fetchone()[0]
 
     conn.commit()
     cur.close()
 
+    return new_id
 
 
 def get_trip_details(scenario_id, conn=None):

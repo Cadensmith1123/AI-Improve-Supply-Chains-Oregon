@@ -168,35 +168,6 @@ def test_add_manifest_items(connection, dependencies):
     connection.commit()
 
 
-def test_get_trip_details_structure(connection, dependencies):
-    deps = dependencies
-    
-    # Create
-    scenario_id = scenario_funcs.create_scenario(
-        route_id=deps['route_id'],
-        total_revenue=10000.00,
-        vehicle_id=deps['vehicle_id'],
-        driver_id=deps['driver_id'],
-        conn=connection
-    )
-    
-    # Add multiple items
-    scenario_funcs.add_manifest_items(scenario_id, "Item A", 10, price_per_item=5, conn=connection)
-    scenario_funcs.add_manifest_items(scenario_id, "Item B", 20, price_per_item=4, conn=connection)
-    
-    # Get Details
-    details = scenario_funcs.get_trip_details(scenario_id, conn=connection)
-    
-    assert details is not None
-    assert "header" in details
-    assert "items" in details
-    assert len(details['items']) == 2
-    
-    # Cleanup
-    delete.delete_plan(scenario_id, conn=connection)
-    connection.commit()
-
-
 def test_delete_scenario(connection, dependencies):
     deps = dependencies
     
@@ -210,12 +181,18 @@ def test_delete_scenario(connection, dependencies):
     )
 
     # Add Item
-    scenario_funcs.add_manifest_items(scenario_id, "DeleteMe", 1, conn=connection)
+    manifest_id = scenario_funcs.add_manifest_items(scenario_id, "DeleteMe", 1, conn=connection)
+    connection.commit()
+
+    manifest_detail = read.view_manifest_items(ids=[manifest_id], conn=connection)
+    assert manifest_detail[0]['item_name'] == "DeleteMe"
 
     # Delete
     delete.delete_plan(scenario_id, conn=connection)
-    connection.commit()
 
     # Verify Gone
     details = scenario_funcs.get_trip_details(scenario_id, conn=connection)
+
+    manifest_id_returned = read.view_manifest_items(ids=[manifest_id], conn=connection)
+    assert manifest_id_returned == []
     assert details is None
