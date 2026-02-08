@@ -2,6 +2,7 @@ from db.functions.connect import get_db
 from db.functions.simple_functions import read, create, delete
 from decimal import Decimal #used to combat floating point errors
 import pandas as pd
+from datetime import date
 
 
 def get_locations():
@@ -16,6 +17,7 @@ def create_scenario(
         driver_id = None,
         run_date = None,
         current_gas_price = None,
+        conn = None
         ):
     """
     Creates new scenario header can take string int or float as inputs. 
@@ -46,10 +48,15 @@ def create_scenario(
     total_revenue = _to_dec(total_revenue)
     current_gas_price = _to_dec(current_gas_price)
 
-    if run_date in ("", None):
-        run_date = None
+    if current_gas_price is None:
+        current_gas_price = 0.0
 
-    conn = get_db()
+
+    if run_date in ("", None):
+        run_date = date.today()
+
+    if conn is None:
+        conn = get_db()
     cur = conn.cursor()
 
     args = [
@@ -78,6 +85,7 @@ def update_scenario(
     driver_id=None,
     run_date=None,
     current_gas_price=None,
+    conn=None
 ):
     """
     Docstring for update_scenario
@@ -96,7 +104,8 @@ def update_scenario(
     def _to_dec(x):
         return Decimal(str(x)) if x not in (None, "") else None
 
-    conn = get_db()
+    if conn is None:
+        conn = get_db()
     cur = conn.cursor(dictionary=True)
 
     args = [
@@ -129,7 +138,8 @@ def add_manifest_items(
         cost_per_item = None,
         items_per_unit = None,
         unit_weight = None,
-        price_per_item = None
+        price_per_item = None,
+        conn = None
 ):
     """
     adds a product to the trip manifest
@@ -149,7 +159,17 @@ def add_manifest_items(
     if quantity_loaded is None or quantity_loaded == "":
         raise ValueError("quantity_loaded is required")
     if item_name is None or item_name == "":
-        raise ValueError("quantity_loaded is required")
+        raise ValueError("item_name is required")
+    if cost_per_item is None or cost_per_item == "":
+        cost_per_item = 0.0
+    if items_per_unit is None or items_per_unit == "":
+        items_per_unit = 1
+    if unit_weight is None or unit_weight == "":
+        unit_weight = 0.0
+    if price_per_item is None or price_per_item == "":
+        price_per_item = 0.0
+    
+
 
     def _to_int(x):
         return int(x) if x not in (None, "") else None
@@ -161,7 +181,7 @@ def add_manifest_items(
         int(scenario_id),
         _to_int(supply_id),
         _to_int(demand_id),
-        item_name,
+        str(item_name),
         _to_dec(quantity_loaded),
         _to_dec(cost_per_item),
         _to_int(items_per_unit),
@@ -169,17 +189,22 @@ def add_manifest_items(
         _to_dec(price_per_item),
     ]
 
-    conn = get_db()
+    if conn is None:
+        conn = get_db()
     cur = conn.cursor()
 
-    cur.callproc("create_manifest_item", args)
+    cur.callproc("add_manifest_item", args)
+    
+    for r in cur.stored_results():
+        new_id = r.fetchone()[0]
 
     conn.commit()
     cur.close()
 
+    return new_id
 
 
-def get_trip_details(scenario_id):
+def get_trip_details(scenario_id, conn=None):
     """
     Returns trip header + manifest line items for a scenario.
 
@@ -193,7 +218,8 @@ def get_trip_details(scenario_id):
 
     scenario_id = int(scenario_id)
 
-    conn = get_db()
+    if conn is None:
+        conn = get_db()
     cur = conn.cursor(dictionary=True)
 
     cur.callproc("get_trip_details", [scenario_id])

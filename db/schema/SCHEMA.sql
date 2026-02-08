@@ -54,6 +54,8 @@ CREATE TABLE vehicles (
     depreciation_per_mile DECIMAL(10,2) NOT NULL,
     
     annual_insurance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    annual_maintenance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+
 
     max_weight_lbs INT NOT NULL,
     max_volume_cubic_ft INT NOT NULL,
@@ -127,22 +129,23 @@ CREATE TABLE scenarios (
     route_id INT,        
     vehicle_id INT,
     driver_id INT,
-    run_date DATE NOT NULL,
+    run_date DATE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    snapshot_driver_wage DECIMAL(5,2) NOT NULL,
-    snapshot_driver_load_wage DECIMAL(5,2) NOT NULL,
-    snapshot_vehicle_mpg DECIMAL(4,1) NOT NULL,
-    snapshot_gas_price DECIMAL(4,2) NOT NULL,
-    snapshot_daily_insurance DECIMAL(10,2) NOT NULL, 
+    snapshot_driver_wage DECIMAL(5,2) DEFAULT 0.00,
+    snapshot_driver_load_wage DECIMAL(5,2) DEFAULT 0.00,
+    snapshot_vehicle_mpg DECIMAL(4,1) DEFAULT 0,
+    snapshot_gas_price DECIMAL(4,2) DEFAULT 0.00,
+    snapshot_daily_insurance DECIMAL(10,2) DEFAULT 0.00,
+    snapshot_maintenance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     
-    snapshot_planned_load_minutes INT NOT NULL,
-    snapshot_planned_unload_minutes INT NOT NULL,
+    snapshot_planned_load_minutes INT NOT NULL DEFAULT 0.00,
+    snapshot_planned_unload_minutes INT NOT NULL DEFAULT 0.00,
 
     actual_load_minutes INT DEFAULT NULL,
     actual_unload_minutes INT DEFAULT NULL,
     
-    snapshot_total_revenue DECIMAL(4,2) NOT NULL,
+    snapshot_total_revenue DECIMAL(10,2) NOT NULL,
     
     FOREIGN KEY (route_id) REFERENCES routes(route_id) ON DELETE SET NULL,
     FOREIGN KEY (vehicle_id) REFERENCES vehicles(vehicle_id) ON DELETE SET NULL,
@@ -151,8 +154,9 @@ CREATE TABLE scenarios (
 
 CREATE TABLE manifest_items (
     manifest_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    item_name VARCHAR(100),
     scenario_id INT NOT NULL,
-    supply_id INT NOT NULL,
+    supply_id INT,
     demand_id INT, 
     
     quantity_loaded DECIMAL(10,2) NOT NULL,
