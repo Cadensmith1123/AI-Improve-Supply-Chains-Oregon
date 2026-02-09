@@ -1,0 +1,91 @@
+:root { --accent: #0b57d0; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+header {
+  padding: 12px 16px;
+  background: #f6f8fb;
+  border-bottom: 1px solid #e6e8ef;
+  position: relative;
+  z-index: 2;
+}
+
+form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+input[type="text"] {
+  padding: 10px 12px;
+  min-width: 260px;
+  border: 1px solid #ccd1d9;
+  border-radius: 8px;
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(11,87,208,0.08);
+}
+
+button {
+  padding: 10px 14px;
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0a4eba;
+}
+
+/* Map fills viewport below header */
+main {
+  height: calc(100vh - 64px);
+  position: relative;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Info card */
+#info {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  display: none;
+  z-index: 2;
+  min-width: 240px;
+}
+
+.value {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.flash {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #ffeeee;
+  color: #8a1f1f;
+  border: 1px solid #f0c4c4;
+}
+
+/* Marker base style */
+.marker-el {
+  cursor: default;
+}
