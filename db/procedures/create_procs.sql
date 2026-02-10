@@ -144,6 +144,7 @@ CREATE PROCEDURE add_scenario(
     IN p_snapshot_vehicle_mpg DECIMAL(4,1),
     IN p_snapshot_gas_price DECIMAL(4,2),
     IN p_snapshot_daily_insurance DECIMAL(10,2),
+    IN p_snapshot_daily_maintenance_cost DECIMAL(10,2),
     IN p_snapshot_planned_load_minutes INT,
     IN p_snapshot_planned_unload_minutes INT,
     IN p_actual_load_minutes INT,
@@ -154,7 +155,7 @@ BEGIN
     INSERT INTO scenarios (
         route_id, vehicle_id, driver_id, run_date,
         snapshot_driver_wage, snapshot_driver_load_wage, snapshot_vehicle_mpg,
-        snapshot_gas_price, snapshot_daily_insurance,
+        snapshot_gas_price, snapshot_daily_insurance, snapshot_daily_maintenance_cost,
         snapshot_planned_load_minutes, snapshot_planned_unload_minutes,
         actual_load_minutes, actual_unload_minutes,
         snapshot_total_revenue
@@ -162,7 +163,7 @@ BEGIN
     VALUES (
         p_route_id, p_vehicle_id, p_driver_id, p_run_date,
         p_snapshot_driver_wage, p_snapshot_driver_load_wage, p_snapshot_vehicle_mpg,
-        p_snapshot_gas_price, p_snapshot_daily_insurance,
+        p_snapshot_gas_price, p_snapshot_daily_insurance, p_snapshot_daily_maintenance_cost,
         p_snapshot_planned_load_minutes, p_snapshot_planned_unload_minutes,
         p_actual_load_minutes, p_actual_unload_minutes,
         p_snapshot_total_revenue
@@ -174,6 +175,7 @@ DELIMITER $$
 
 DROP PROCEDURE IF EXISTS add_manifest_item$$
 
+
 CREATE PROCEDURE add_manifest_item(
     IN p_scenario_id INT,
     IN p_supply_id INT,
@@ -183,6 +185,7 @@ CREATE PROCEDURE add_manifest_item(
     IN p_snapshot_cost_per_item DECIMAL(10,2),
     IN p_snapshot_items_per_unit INT,
     IN p_snapshot_unit_weight DECIMAL(8,2),
+    IN p_snapshot_unit_volume DECIMAL(8,2),
     IN p_snapshot_price_per_item DECIMAL(10,2)
 )
 BEGIN
@@ -190,7 +193,8 @@ BEGIN
         scenario_id, supply_id, demand_id, item_name,
         quantity_loaded,
         snapshot_cost_per_item, snapshot_items_per_unit,
-        snapshot_unit_weight, snapshot_price_per_item
+        snapshot_unit_weight, snapshot_unit_volume,
+        snapshot_price_per_item
     )
     VALUES (
         p_scenario_id, 
@@ -199,8 +203,10 @@ BEGIN
         p_item_name,
         p_quantity_loaded,
         p_snapshot_cost_per_item, p_snapshot_items_per_unit,
-        p_snapshot_unit_weight, p_snapshot_price_per_item
+        p_snapshot_unit_weight, p_snapshot_unit_volume,
+        p_snapshot_price_per_item
     );
+
     SELECT LAST_INSERT_ID() AS new_id;
 END$$
 
