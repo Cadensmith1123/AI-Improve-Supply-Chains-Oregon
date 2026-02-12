@@ -139,7 +139,7 @@ def test_add_manifest_items(connection, dependencies):
     
     scenario_funcs.add_manifest_items(
         scenario_id=scenario_id,
-        quantity_loaded=100, 
+        quantity_loaded=100,
         supply_id=None,
         demand_id=None,
         item_name=f"Item_{random_name}",
@@ -147,6 +147,7 @@ def test_add_manifest_items(connection, dependencies):
         price_per_item=12.50,
         items_per_unit=10,
         unit_weight=50,
+        unit_volume=10,
         conn=connection
     )
     

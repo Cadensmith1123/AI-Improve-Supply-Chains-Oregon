@@ -137,7 +137,7 @@ CREATE TABLE scenarios (
     snapshot_vehicle_mpg DECIMAL(4,1) DEFAULT 0,
     snapshot_gas_price DECIMAL(4,2) DEFAULT 0.00,
     snapshot_daily_insurance DECIMAL(10,2) DEFAULT 0.00,
-    snapshot_maintenance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    snapshot_daily_maintenance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     
     snapshot_planned_load_minutes INT NOT NULL DEFAULT 0.00,
     snapshot_planned_unload_minutes INT NOT NULL DEFAULT 0.00,
@@ -164,8 +164,9 @@ CREATE TABLE manifest_items (
     snapshot_cost_per_item DECIMAL(10,2) NOT NULL,
     snapshot_items_per_unit INT NOT NULL, 
     snapshot_unit_weight DECIMAL(8,2) NOT NULL,
+    snapshot_unit_volume DECIMAL(8,2) NOT NULL DEFAULT 0,
     snapshot_price_per_item DECIMAL(10,2) NOT NULL,
-    
+
     FOREIGN KEY (scenario_id) REFERENCES scenarios(scenario_id) ON DELETE CASCADE,
     FOREIGN KEY (supply_id) REFERENCES supply(supply_id) ON DELETE RESTRICT,
     FOREIGN KEY (demand_id) REFERENCES demand(demand_id) ON DELETE SET NULL

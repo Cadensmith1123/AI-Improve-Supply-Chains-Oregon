@@ -1,4 +1,5 @@
 from ..connect import get_db
+from decimal import Decimal
 
 LOCATION_TYPES = {"Hub", "Store", "Farm"}
 STORAGE_TYPES = {"Dry", "Ref", "Frz"}
@@ -142,7 +143,8 @@ def add_route(name, origin_location_id, dest_location_id, conn=None):
 def add_scenario(
     route_id, vehicle_id, driver_id, run_date,
     snapshot_driver_wage, snapshot_driver_load_wage,
-    snapshot_vehicle_mpg, snapshot_gas_price, snapshot_daily_insurance,
+    snapshot_vehicle_mpg, snapshot_gas_price,
+    snapshot_daily_insurance, snapshot_daily_maintenance_cost,
     snapshot_planned_load_minutes, snapshot_planned_unload_minutes,
     actual_load_minutes, actual_unload_minutes, snapshot_total_revenue,
     conn=None
@@ -154,7 +156,8 @@ def add_scenario(
     cur.callproc("add_scenario", [
         route_id, vehicle_id, driver_id, run_date,
         snapshot_driver_wage, snapshot_driver_load_wage,
-        snapshot_vehicle_mpg, snapshot_gas_price, snapshot_daily_insurance,
+        snapshot_vehicle_mpg, snapshot_gas_price,
+        snapshot_daily_insurance, snapshot_daily_maintenance_cost,
         snapshot_planned_load_minutes, snapshot_planned_unload_minutes,
         actual_load_minutes, actual_unload_minutes, snapshot_total_revenue
     ])
@@ -166,22 +169,60 @@ def add_scenario(
 
 
 def add_manifest_item(
-    scenario_id, supply_id, demand_id, quantity_loaded,
-    snapshot_cost_per_item, snapshot_items_per_unit,
-    snapshot_unit_weight, snapshot_price_per_item,
+    scenario_id,
+    item_name,
+    quantity_loaded,
+    supply_id=None,
+    demand_id=None,
+    snapshot_cost_per_item=0.0,
+    snapshot_items_per_unit=1,
+    snapshot_unit_weight=0.0,
+    snapshot_unit_volume=0.0,   
+    snapshot_price_per_item=0.0,
     conn=None
 ):
+    if scenario_id in (None, ""):
+        raise ValueError("scenario_id is required")
+    if item_name in (None, ""):
+        raise ValueError("item_name is required")
+    if quantity_loaded in (None, ""):
+        raise ValueError("quantity_loaded is required")
+
+    def _to_int(x):
+        return int(x) if x not in (None, "") else None
+
+    def _to_dec(x):
+        return Decimal(str(x)) if x not in (None, "") else Decimal("0")
+
     if conn is None:
         conn = get_db()
 
+    args = [
+        int(scenario_id),              # p_scenario_id
+        _to_int(supply_id),            # p_supply_id
+        _to_int(demand_id),            # p_demand_id
+        str(item_name),                # p_item_name
+        _to_dec(quantity_loaded),      # p_quantity_loaded
+        _to_dec(snapshot_cost_per_item),
+        _to_int(snapshot_items_per_unit) or 1,
+        _to_dec(snapshot_unit_weight),
+        _to_dec(snapshot_unit_volume),
+        _to_dec(snapshot_price_per_item),
+    ]
+
     cur = conn.cursor()
-    cur.callproc("add_manifest_item", [
-        scenario_id, item_name, supply_id, demand_id, quantity_loaded,
-        snapshot_cost_per_item, snapshot_items_per_unit,
-        snapshot_unit_weight, snapshot_price_per_item
-    ])
+    cur.callproc("add_manifest_item", args)
+
+    new_id = None
     for r in cur.stored_results():
-        new_id = r.fetchone()[0]
+        row = r.fetchone()
+        if row:
+            new_id = row[0]
+
     conn.commit()
     cur.close()
+
+    if new_id is None:
+        raise RuntimeError("add_manifest_item did not return new_id")
+
     return new_id
