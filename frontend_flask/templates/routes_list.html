@@ -137,7 +137,6 @@
     {% endwith %}
   </header>
 
-  <!-- FINALLY the Map + info panel -->
   <section id="layout">
     <div id="map"></div>
     <div id="info">
@@ -152,12 +151,9 @@
     Health check: <a href="/health">/health</a>
   </p>
 
-  <!-- Map logic (same as your standalone map page, adapted) -->
   <script>
-    // Mapbox token from Flask (app.py)
     mapboxgl.accessToken = "{{ mapbox_token }}";
 
-    // Default Oregon view when no route yet
     const OREGON = { center: [-120.554201, 43.804133], zoom: 5.2 };
 
     // Start/end from server (or null)
@@ -180,7 +176,6 @@
     map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
     map.addControl(new mapboxgl.ScaleControl({ maxWidth: 120, unit: 'imperial' }));
 
-    // Directions control (traffic-aware) — NOT interactive for dragging/setting waypoints
     const directions = new MapboxDirections({
       accessToken: mapboxgl.accessToken,
       unit: 'imperial',
