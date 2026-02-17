@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Products</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; }
+    table { border-collapse: collapse; width: 100%; max-width: 1100px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background: #f5f5f5; }
+    a { color: #1D499B; text-decoration: none; font-weight: 600; }
+    a:hover { text-decoration: underline; }
+    .nav { margin-bottom: 14px; }
+    .nav a { margin-right: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Products</h1>
+
+  <div class="nav">
+    <a href="/routes">Routes</a>
+   
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>product_id</th>
+        <th>product_name</th>
+        <th>sku</th>
+        <th>category</th>
+        <th>unit</th>
+        <th>unit_price</th>
+        <th>quantity</th>
+        <th>actions</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for p in products %}
+        <tr>
+          <td>{{ p.product_id }}</td>
+          <td>{{ p.product_name }}</td>
+          <td>{{ p.sku }}</td>
+          <td>{{ p.category }}</td>
+          <td>{{ p.unit }}</td>
+          <td>
+            {% if p.unit_price is not none %}
+              ${{ "%.2f"|format(p.unit_price) }}
+            {% else %}
+              <em>—</em>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.quantity is not none %}
+              {{ p.quantity }}
+            {% else %}
+              <em>—</em>
+            {% endif %}
+          </td>
+          <td><a href="/products/{{ p.product_id }}/edit">Edit</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
