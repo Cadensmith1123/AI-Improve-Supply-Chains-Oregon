@@ -30,7 +30,7 @@ def test_scenario_creation_with_manifest(route_id, output_file, conn=None):
             "item_name": "apples",
             "quantity_loaded": 1,
             "cost_per_item": .7,
-            "unit_weight_lbs": 42, # Standardized key
+            "unit_weight_lbs": 42,
             "unit_volume": 1.244,
             
             "items_per_unit": 100,
@@ -41,14 +41,14 @@ def test_scenario_creation_with_manifest(route_id, output_file, conn=None):
             "item_name": "pears",
             "quantity_loaded": 2,
             "cost_per_item": .5,
-            "unit_weight_lbs": 45, # Standardized key
+            "unit_weight_lbs": 45,
             "unit_volume": 1.244,
             "items_per_unit": 140,
             "price_per_item": 3
         }
     ]
 
-    # 1. Preview Metrics (In-Memory)
+    # 1. Preview Metrics
     print("\n--- PREVIEW (No DB Save) ---")
     preview = scenario_management.calculate_scenario_metrics(manifest_args, entered_revenue=2000.53)
     print(f"Preview Calculated Revenue: {preview['totals']['calculated_revenue']}")
