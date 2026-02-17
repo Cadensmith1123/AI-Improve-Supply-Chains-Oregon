@@ -1,9 +1,40 @@
-from ..connect import get_db, execute_creation_proc
+from ..connect import get_db
 from decimal import Decimal
 
 LOCATION_TYPES = {"Hub", "Store", "Farm"}
 STORAGE_TYPES = {"Dry", "Ref", "Frz"}
 VEHICLE_STORAGE_TYPES = {"Dry", "Ref", "Frz", "Multi"}
+
+
+def _call_create_proc(proc_name, args, conn=None):
+    """
+    Executes a stored procedure that inserts a record and returns its new ID.
+    Handles connection lifecycle (opens/closes if conn is None).
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db()
+        should_close = True
+    
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
+
+    new_id = None
+    try:
+        cur = conn.cursor()
+        cur.callproc(proc_name, args)
+
+        for r in cur.stored_results():
+            row = r.fetchone()
+            if row:
+                new_id = row[0]
+        conn.commit()
+        cur.close()
+    finally:
+        if should_close and conn:
+            conn.close()
+
+    return new_id
 
 
 def add_location(
@@ -20,7 +51,7 @@ def add_location(
         name, type, address_street, city, state, zip_code, phone,
         latitude, longitude, avg_load_minutes, avg_unload_minutes
     ]
-    return execute_creation_proc("add_location", args, conn)
+    return _call_create_proc("add_location", args, conn)
 
 
 def add_product_master(tenant_id, product_code, name, storage_type, conn=None):
@@ -28,12 +59,12 @@ def add_product_master(tenant_id, product_code, name, storage_type, conn=None):
         raise ValueError(f"Invalid storage type: {storage_type}")
 
     args = [tenant_id, product_code, name, storage_type]
-    return execute_creation_proc("add_product_master", args, conn)
+    return _call_create_proc("add_product_master", args, conn)
 
 
 def add_driver(tenant_id, name, hourly_drive_wage, hourly_load_wage, conn=None):
     args = [tenant_id, name, hourly_drive_wage, hourly_load_wage]
-    return execute_creation_proc("add_driver", args, conn)
+    return _call_create_proc("add_driver", args, conn)
 
 
 def add_vehicle(
@@ -50,12 +81,12 @@ def add_vehicle(
         name, mpg, depreciation_per_mile, annual_insurance_cost,
         annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type
     ]
-    return execute_creation_proc("add_vehicle", args, conn)
+    return _call_create_proc("add_vehicle", args, conn)
 
 
 def add_entity(tenant_id, name, entity_min_profit, conn=None):
     args = [tenant_id, name, entity_min_profit]
-    return execute_creation_proc("add_entity", args, conn)
+    return _call_create_proc("add_entity", args, conn)
 
 
 def add_supply(
@@ -69,17 +100,17 @@ def add_supply(
         entity_id, location_id, product_code, quantity_available,
         unit_weight_lbs, unit_volume_cu_ft, items_per_handling_unit, cost_per_item
     ]
-    return execute_creation_proc("add_supply", args, conn)
+    return _call_create_proc("add_supply", args, conn)
 
 
 def add_demand(tenant_id, location_id, product_code, quantity_needed, max_price, conn=None):
     args = [tenant_id, location_id, product_code, quantity_needed, max_price]
-    return execute_creation_proc("add_demand", args, conn)
+    return _call_create_proc("add_demand", args, conn)
 
 
 def add_route(tenant_id, name, origin_location_id, dest_location_id, conn=None):
     args = [tenant_id, name, origin_location_id, dest_location_id]
-    return execute_creation_proc("add_route", args, conn)
+    return _call_create_proc("add_route", args, conn)
 
 
 def add_scenario(
@@ -101,7 +132,7 @@ def add_scenario(
         snapshot_planned_load_minutes, snapshot_planned_unload_minutes,
         actual_load_minutes, actual_unload_minutes, snapshot_total_revenue
     ]
-    return execute_creation_proc("add_scenario", args, conn)
+    return _call_create_proc("add_scenario", args, conn)
 
 
 def _to_int(x):
@@ -147,7 +178,7 @@ def add_manifest_item(
         _to_dec(snapshot_price_per_item),
     ]
 
-    new_id = execute_creation_proc("add_manifest_item", args, conn)
+    new_id = _call_create_proc("add_manifest_item", args, conn)
 
     if new_id is None:
         raise RuntimeError("add_manifest_item did not return new_id")

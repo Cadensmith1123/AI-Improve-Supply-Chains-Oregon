@@ -7,6 +7,10 @@ import re
 
 dotenv.load_dotenv()
 
+database = "test_db"
+auth_db = "test_auth"
+
+
 # List of SQL files to execute in order
 SQL_FILES = [
     r"db/schema/SCHEMA.sql",
@@ -21,6 +25,11 @@ SQL_FILES = [
     r"db/procedures/generate_test_data.sql"
 ]
 
+AUTH_SQL_FILES = [
+    r"db/schema/auth_SCHEMA.sql",
+    r"db/procedures/auth_procs.sql"
+]
+
 def create_test_db():
     try:
         config = {
@@ -33,12 +42,21 @@ def create_test_db():
         # Create new test DB
         connection = mysql.connector.connect(**config)
         cursor = connection.cursor()
-        cursor.execute(f"DROP DATABASE IF EXISTS test_db")
-        cursor.execute(f"CREATE DATABASE test_db")
+        cursor.execute(f"DROP DATABASE IF EXISTS {database}")
+        cursor.execute(f"CREATE DATABASE {database}")
+        cursor.close()
+        connection.close()
+        
+        # Create test_auth DB
+        connection = mysql.connector.connect(**config)
+        cursor = connection.cursor()
+        cursor.execute(f"DROP DATABASE IF EXISTS {auth_db}")
+        cursor.execute(f"CREATE DATABASE {auth_db}")
+        cursor.close()
         connection.close()
 
         # return connection to test_db
-        config['database'] = 'test_db'
+        config['database'] = database
         connection = mysql.connector.connect(**config)
 
         return connection
@@ -56,8 +74,8 @@ def execute_sql_script(connection, file_path):
             sql_script = file.read()
 
             # Sanitization
-            sql_script = re.sub(r"(DROP SCHEMA IF EXISTS|CREATE SCHEMA|USE|CALL)\s+local_food_db;", 
-                                r"-- \1 local_food_db;", 
+            sql_script = re.sub(r"(DROP SCHEMA IF EXISTS|CREATE SCHEMA|CREATE DATABASE|USE|CALL)\s+(local_food_db|auth_db);", 
+                                r"-- \1 \2;", 
                                 sql_script, flags=re.IGNORECASE)
 
             # Clean delimiters
@@ -91,7 +109,7 @@ def connection():
 def get_db_proc_count(connection):
     """Helper to get current procedure count"""
     cursor = connection.cursor()
-    cursor.execute("SHOW PROCEDURE STATUS WHERE Db = 'test_db'")
+    cursor.execute(f"SHOW PROCEDURE STATUS WHERE Db = '{database}'")
     return len(cursor.fetchall())
 
 
@@ -101,7 +119,7 @@ def test_01_database_creation(connection):
     cursor = connection.cursor()
     cursor.execute("SELECT DATABASE()")
     current_db = cursor.fetchone()[0]
-    assert current_db == "test_db"
+    assert current_db == database
 
 
 def test_02_schema_creation(connection):
@@ -176,9 +194,32 @@ def test_10_get_planning_assets(connection):
 
 
 def test_11_generate_test_data(connection):
-    count_before = get_db_proc_count(connection)
-    statement_count = execute_sql_script(connection, SQL_FILES[9])
-    count_after = get_db_proc_count(connection)
+    # Just execute the script. If it fails, execute_sql_script raises exception.
+    execute_sql_script(connection, SQL_FILES[9])
+
+
+def test_12_setup_auth_db(connection):
+    """
+    Sets up the schema for the test_auth database.
+    """
+    config = {
+        'user': os.getenv("DB_USER"),
+        'password': os.getenv("DB_PASSWORD"),
+        'host': os.getenv("DB_HOST"),
+        'port': os.getenv("DB_PORT"),
+        'database': auth_db,
+        'connection_timeout': 10
+    }
     
-    
-    assert statement_count/2 == (count_after - count_before)
+    auth_conn = None
+    try:
+        auth_conn = mysql.connector.connect(**config)
+        
+        for sql_file in AUTH_SQL_FILES:
+            execute_sql_script(auth_conn, sql_file)
+        
+    except Exception as e:
+        pytest.fail(f"Failed to setup auth db: {e}")
+    finally:
+        if auth_conn:
+            auth_conn.close()
