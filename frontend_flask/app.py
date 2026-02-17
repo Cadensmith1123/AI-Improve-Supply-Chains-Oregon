@@ -1,7 +1,99 @@
-from flask import Flask, render_template, request, redirect, url_for, abort
+import os
+from flask import Flask, render_template, request, redirect, url_for, abort, flash
+import urllib.parse
+import requests
+from typing import Tuple
 import db
 
+from dotenv import load_dotenv 
+
+load_dotenv()
+
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "change")
+
+MAPBOX_TOKEN = os.getenv("MAPBOX_TOKEN")
+if not MAPBOX_TOKEN:
+    raise RuntimeError("MAPBOX_TOKEN is not set. Define it in your environment or .env")
+
+GEOCODE_ENDPOINT = "https://api.mapbox.com/geocoding/v5/mapbox.places/{query}.json"
+_session = requests.Session()
+
+def geocode_address(address: str) -> Tuple[float, float, str]:
+    address = (address or "").strip()
+    if not address:
+        raise ValueError("Address cannot be empty.")
+
+    params = {
+        "access_token": MAPBOX_TOKEN,
+        "limit": 1,
+        "autocomplete": "false",
+        "types": "address,poi,place",
+    }
+
+    url = GEOCODE_ENDPOINT.format(query=urllib.parse.quote(address))
+
+    try:
+        response = _session.get(url, params=params, timeout=10)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        raise RuntimeError("Geocoding request failed") from e
+
+    data = response.json()
+    features = data.get("features")
+
+    if not features:
+        raise ValueError(f"No geocoding match found for: {address}")
+
+    feature = features[0]
+    try:
+        lon, lat = feature["center"]
+    except (KeyError, ValueError):
+        raise RuntimeError("Unexpected geocoding response format")
+
+    place_name = feature.get("place_name", address)
+    return lon, lat, place_name
+
+@app.route("/", methods=["GET"])
+def index():
+    args = {
+        "start": request.args.get("start", "") or "",
+        "end": request.args.get("end", "") or "",
+        "start_lng": request.args.get("start_lng"),
+        "start_lat": request.args.get("start_lat"),
+        "end_lng": request.args.get("end_lng"),
+        "end_lat": request.args.get("end_lat"),
+    }
+    args = {k: v for k, v in args.items() if v is not None}
+    return redirect(url_for("routes_list", **args))
+
+@app.route("/calculate_route", methods=["POST"])
+def route():
+    start_query = request.form.get("start", "").strip()
+    end_query = request.form.get("end", "").strip()
+
+    if not start_query or not end_query:
+        flash("Please enter both start and end addresses.", "error")
+        return redirect(url_for("index", start=start_query, end=end_query))
+
+    try:
+        s_lon, s_lat, s_label = geocode_address(start_query)
+        e_lon, e_lat, e_label = geocode_address(end_query)
+    except Exception as e:
+        flash(str(e), "error")
+        return redirect(url_for("index", start=start_query, end=end_query))
+
+    return redirect(url_for(
+        "index",
+        start=s_label,
+        end=e_label,
+        start_lng=s_lon,
+        start_lat=s_lat,
+        end_lng=e_lon,
+        end_lat=e_lat
+    ))
+# === End moved block ===
+
 
 def validate_route_form(form):
     errors = {}
@@ -69,8 +161,31 @@ def routes_list():
         r["origin_name"] = locations.get(r["origin_location_id"], f"#{r['origin_location_id']}")
         r["dest_name"] = locations.get(r["dest_location_id"], f"#{r['dest_location_id']}")
 
-    return render_template("routes_list.html", routes=routes)
+    # --- NEW: support map + form context (mirrors your index route) ---
+    start_query = request.args.get("start", "") or ""
+    end_query   = request.args.get("end", "") or ""
 
+    start_lng = request.args.get("start_lng")
+    start_lat = request.args.get("start_lat")
+    end_lng   = request.args.get("end_lng")
+    end_lat   = request.args.get("end_lat")
+
+    start = None
+    end = None
+    if start_lng and start_lat:
+        start = {"lon": float(start_lng), "lat": float(start_lat), "label": start_query}
+    if end_lng and end_lat:
+        end = {"lon": float(end_lng), "lat": float(end_lat), "label": end_query}
+
+    return render_template(
+        "routes_list.html",
+        routes=routes,
+        mapbox_token=MAPBOX_TOKEN,  # comes from your merged app.py
+        start_query=start_query,
+        end_query=end_query,
+        start=start,
+        end=end
+    )
 
 @app.get("/routes/<int:route_id>/edit")
 def route_edit_get(route_id: int):
