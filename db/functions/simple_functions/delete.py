@@ -32,6 +32,9 @@ def _call_delete_proc(proc_name, tenant_id, id_value, conn=None):
         conn = get_db()
         should_close = True
     
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
+    
     try:
         cur = conn.cursor(dictionary=True)
 

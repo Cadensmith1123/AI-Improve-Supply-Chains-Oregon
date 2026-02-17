@@ -19,8 +19,8 @@ def _cols_arg(columns):
         raise ValueError("columns must be a list or None")
 
     # Security: Validate column names to prevent SQL injection
-    # Allow alphanumeric, underscores, and backticks
-    valid_col_pattern = re.compile(r"^[a-zA-Z0-9_`]+$")
+    # Allow alphanumeric and underscores
+    valid_col_pattern = re.compile(r"^[a-zA-Z0-9_]+$")
     for col in columns:
         if not valid_col_pattern.match(col):
             raise ValueError(f"Invalid column name: {col}")
@@ -62,7 +62,8 @@ def _ids_arg(ids):
     formatted = []
     for i in ids:
         if isinstance(i, str):
-            val = i.replace("'", "''")
+            # Security: Escape backslashes first to prevent escaping the closing quote
+            val = i.replace("\\", "\\\\").replace("'", "''")
             formatted.append(f"'{val}'")
         else:
             formatted.append(str(i))
@@ -82,6 +83,9 @@ def _call_view_proc(proc_name, tenant_id, conn=None, columns=None, limit=None, i
     if conn is None:
         conn = get_db()
         should_close = True
+    
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
 
     try:
         cur = conn.cursor(dictionary=True)

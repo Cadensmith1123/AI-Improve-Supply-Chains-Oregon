@@ -1,12 +1,12 @@
 from db.functions.connect import get_db
-from db.functions.simple_functions import read, create, delete
+from db.functions.simple_functions import read, create
 from decimal import Decimal #used to combat floating point errors
 import pandas as pd
 from datetime import date
 
 
-def get_locations(tenant_id):
-    location_data = read.view_locations(tenant_id, columns=['location_id', 'name'])
+def get_locations(tenant_id, conn=None):
+    location_data = read.view_locations(tenant_id, conn=conn, columns=['location_id', 'name'])
     return location_data
 
 
@@ -52,7 +52,7 @@ def create_scenario(
     current_gas_price = _to_dec(current_gas_price)
 
     if current_gas_price is None:
-        current_gas_price = 0.0
+        current_gas_price = Decimal("0.0")
 
     if run_date in ("", None):
         run_date = date.today()
@@ -61,6 +61,9 @@ def create_scenario(
     if conn is None:
         conn = get_db()
         should_close = True
+    
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
 
     try:
         cur = conn.cursor()
@@ -113,6 +116,9 @@ def update_scenario(
     if conn is None:
         conn = get_db()
         should_close = True
+    
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
 
     try:
         cur = conn.cursor(dictionary=True)
@@ -249,6 +255,9 @@ def get_trip_details(tenant_id, scenario_id, conn=None):
     if conn is None:
         conn = get_db()
         should_close = True
+    
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
 
     try:
         cur = conn.cursor(dictionary=True)

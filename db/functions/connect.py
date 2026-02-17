@@ -19,7 +19,8 @@ def get_db():
     try:
         return mysql.connector.connect(**db_config)
     except Exception as e:
-        print(f"DB Error: {e}")
+        # Security: Don't print full exception as it may contain credentials
+        print(f"DB Connection Error: {type(e).__name__}")
         return None
 
 
@@ -32,6 +33,9 @@ def execute_creation_proc(proc_name, args, conn=None):
     if conn is None:
         conn = get_db()
         should_close = True
+    
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
 
     new_id = None
     try:

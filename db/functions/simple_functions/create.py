@@ -104,6 +104,14 @@ def add_scenario(
     return execute_creation_proc("add_scenario", args, conn)
 
 
+def _to_int(x):
+    return int(x) if x not in (None, "") else None
+
+
+def _to_dec(x):
+    return Decimal(str(x)) if x not in (None, "") else Decimal("0")
+
+
 def add_manifest_item(
     tenant_id,
     scenario_id,
@@ -124,12 +132,6 @@ def add_manifest_item(
         raise ValueError("item_name is required")
     if quantity_loaded in (None, ""):
         raise ValueError("quantity_loaded is required")
-
-    def _to_int(x):
-        return int(x) if x not in (None, "") else None
-
-    def _to_dec(x):
-        return Decimal(str(x)) if x not in (None, "") else Decimal("0")
 
     args = [
         tenant_id,
