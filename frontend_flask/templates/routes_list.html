@@ -1,8 +1,18 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>Routes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Mapbox GL JS CSS & JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+
+  <!-- Mapbox Directions Plugin CSS & JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+
   <style>
     body { font-family: Arial, sans-serif; padding: 24px; }
     table { border-collapse: collapse; width: 100%; max-width: 1100px; }
@@ -10,9 +20,69 @@
     th { background: #f5f5f5; }
     a { color: #1D499B; text-decoration: none; font-weight: 600; }
     a:hover { text-decoration: underline; }
+
+    /* Map + info panel */
+    #layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-top: 16px;
+      margin-bottom: 24px;
+      max-width: 1100px;
+    }
+    /* Two-column option (commented):
+       #layout { grid-template-columns: 2fr 1fr; } */
+
+    #map { width: 100%; height: 420px; border-radius: 6px; overflow: hidden; border: 1px solid #ddd; }
+    #info {
+      display: none;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fafafa;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    #info .value { font-weight: 600; }
+
+    header form {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 16px 0 10px 0; /* gives a little separation from the table */
+      max-width: 1100px;
+    }
+    header input[type="text"] {
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      min-width: 220px;
+      flex: 1;
+    }
+    header button {
+      padding: 8px 12px;
+      background: #1D499B;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    header button:hover { background: #163a7b; }
+
+    .flash {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border: 1px solid #e0b4b4;
+      background: #fff6f6;
+      color: #9f3a38;
+      border-radius: 4px;
+      max-width: 1100px;
+    }
   </style>
 </head>
 <body>
+
   <h1>Routes</h1>
 
   <table>
@@ -26,7 +96,6 @@
         <th>actions</th>
       </tr>
     </thead>
-
     <tbody>
       {% for r in routes %}
         <tr>
@@ -49,8 +118,335 @@
     </tbody>
   </table>
 
+  <!-- THEN the Start/End form -->
+  <header>
+    <!-- Start/End form posts to the calculate endpoint (function name is `route`) -->
+    <form action="{{ url_for('route') }}" method="post" novalidate>
+      <input type="text" name="start" placeholder="Start address" value="{{ start_query }}" required />
+      <input type="text" name="end" placeholder="End address" value="{{ end_query }}" required />
+      <button type="submit">Get Route</button>
+    </form>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, msg in messages %}
+          <div class="flash">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </header>
+
+  <!-- FINALLY the Map + info panel -->
+  <section id="layout">
+    <div id="map"></div>
+    <div id="info">
+      <div>From: <span id="fromLabel" class="value"></span></div>
+      <div>To: <span id="toLabel" class="value"></span></div>
+      <div>Distance: <span id="distance" class="value"></span></div>
+      <div>ETA (live): <span id="eta" class="value"></span></div>
+    </div>
+  </section>
+
   <p style="margin-top: 16px;">
     Health check: <a href="/health">/health</a>
   </p>
+
+  <!-- Map logic (same as your standalone map page, adapted) -->
+  <script>
+    // Mapbox token from Flask (app.py)
+    mapboxgl.accessToken = "{{ mapbox_token }}";
+
+    // Default Oregon view when no route yet
+    const OREGON = { center: [-120.554201, 43.804133], zoom: 5.2 };
+
+    // Start/end from server (or null)
+    const start = {{ (start | tojson) if start else 'null' }};
+    const end   = {{ (end   | tojson) if end   else 'null' }};
+
+    // Always-on traffic basemap
+    const STYLE_TRAFFIC_DAY = 'mapbox://styles/mapbox/traffic-day-v2';
+
+    // Map
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: STYLE_TRAFFIC_DAY,
+      center: OREGON.center,
+      zoom: OREGON.zoom
+    });
+
+    // Controls
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 120, unit: 'imperial' }));
+
+    // Directions control (traffic-aware) — NOT interactive for dragging/setting waypoints
+    const directions = new MapboxDirections({
+      accessToken: mapboxgl.accessToken,
+      unit: 'imperial',
+      profile: 'mapbox/driving-traffic', // live-traffic ETA
+      alternatives: false,
+      geometries: 'geojson',             // reliable bounds + our overlay
+      interactive: false,                // disable dragging & map-click
+      controls: {
+        inputs: false,                   // we already have our own form
+        instructions: false,
+        profileSwitcher: false
+      },
+      flyTo: false
+    });
+
+    // Keep last endpoints
+    let lastOrigin = null;
+    let lastDestination = null;
+
+    // Custom markers
+    let startMarker = null; // person icon
+    let endMarker = null;   // red dot
+
+    map.on('load', () => {
+      if (start && end) {
+        // Show info panel with labels
+        document.getElementById('info').style.display = 'block';
+        document.getElementById('fromLabel').textContent = start.label || `${start.lat.toFixed(5)}, ${start.lon.toFixed(5)}`;
+        document.getElementById('toLabel').textContent   = end.label || `${end.lat.toFixed(5)}, ${end.lon.toFixed(5)}`;
+
+        map.addControl(directions, 'top-left');
+        lastOrigin = [start.lon, start.lat];
+        lastDestination = [end.lon, end.lat];
+        directions.setOrigin(lastOrigin);
+        directions.setDestination(lastDestination);
+
+        directions.on('route', async (ev) => {
+          if (!ev.route || !ev.route[0]) return;
+          const route = ev.route[0];
+
+          const miles = route.distance / 1609.34;
+          const mins  = route.duration / 60;
+          const h = Math.floor(mins / 60);
+          const m = Math.round(mins % 60);
+          document.getElementById('distance').textContent = `${miles.toFixed(2)} mi`;
+          document.getElementById('eta').textContent      = `${h} hr ${m} min`;
+
+          fitToRoute(route);
+
+          try {
+            await drawTrafficColoredRoute(lastOrigin, lastDestination);
+            hideDirectionsRouteLayers();
+          } catch (err) {
+            console.error('Failed to draw traffic-colored route:', err);
+          }
+
+          try {
+            placeOrUpdateStartMarker(lastOrigin);
+            placeOrUpdateEndMarker(lastDestination);
+            hideDirectionsWaypointLayersStrict();
+          } catch (e) {
+            console.warn('Custom markers failed:', e);
+          }
+        });
+
+        map.on('style.load', hideDirectionsWaypointLayersStrict);
+      }
+    });
+
+
+    function placeOrUpdateStartMarker(lngLat) {
+      const el = document.createElement('div');
+      el.className = 'marker-el';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
+      el.style.width = '30px';
+      el.style.height = '30px';
+      el.style.filter = 'drop-shadow(0 1px 2px rgba(0,0,0,0.45))';
+
+      el.innerHTML = `
+        <svg width="28" height="28" viewBox="0 0 24 24" aria-label="Start person icon">
+          <!-- Head -->
+          <circle cx="12" cy="6.2" r="3.0" fill="#1E88E5" stroke="white" stroke-width="1.4"/>
+          <!-- Torso/shoulders -->
+          <path d="M12 10
+                   c-3.8 0 -6.5 2 -6.5 4.6
+                   v3.2
+                   c0 .7 .6 1.2 1.3 1.2
+                   h10.4
+                   c.7 0 1.3-.5 1.3-1.2
+                   v-3.2
+                   C18.5 12 15.8 10 12 10z"
+                fill="#1E88E5" stroke="white" stroke-width="1.4" />
+        </svg>
+      `;
+
+      if (!startMarker) {
+        startMarker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(lngLat)
+          .addTo(map);
+      } else {
+        startMarker.setLngLat(lngLat);
+        startMarker.getElement().replaceWith(el);
+        startMarker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(lngLat)
+          .addTo(map);
+      }
+    }
+
+    function placeOrUpdateEndMarker(lngLat) {
+      const el = document.createElement('div');
+      el.className = 'marker-el';
+      el.style.width = '18px';
+      el.style.height = '18px';
+      el.style.borderRadius = '50%';
+      el.style.background = '#E53935'; 
+      el.style.border = '3px solid #fff';
+      el.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)';
+
+      if (!endMarker) {
+        endMarker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat(lngLat)
+          .addTo(map);
+      } else {
+        endMarker.setLngLat(lngLat);
+        endMarker.getElement().replaceWith(el);
+        endMarker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat(lngLat)
+          .addTo(map);
+      }
+    }
+
+
+    function fitToRoute(route) {
+      const geom = route.geometry;
+      if (!geom || geom.type !== 'LineString') return;
+      const coords = geom.coordinates;
+      const bounds = new mapboxgl.LngLatBounds();
+      coords.forEach(c => bounds.extend(c));
+      map.fitBounds(bounds, { padding: 80, duration: 700, maxZoom: 14 });
+    }
+
+    function hideDirectionsRouteLayers() {
+      const style = map.getStyle();
+      if (!style || !style.layers) return;
+      style.layers.forEach(layer => {
+        if (layer.type === 'line' && /directions-route-line/i.test(layer.id)) {
+          try { map.setPaintProperty(layer.id, 'line-opacity', 0); } catch {}
+        }
+        if (layer.type === 'line' && /directions-route-line-casing/i.test(layer.id)) {
+          try { map.setPaintProperty(layer.id, 'line-opacity', 0); } catch {}
+        }
+      });
+    }
+
+    function hideDirectionsWaypointLayersStrict() {
+      const style = map.getStyle();
+      if (!style || !style.layers) return;
+
+      const candidates = [
+        'directions-waypoint-point',
+        'directions-waypoint-label',
+        'directions-origin-point',
+        'directions-origin-label',
+        'directions-destination-point',
+        'directions-destination-label',
+      ];
+
+      for (const id of candidates) {
+        if (map.getLayer(id)) {
+          try { map.setLayoutProperty(id, 'visibility', 'none'); } catch {}
+          try { map.setPaintProperty(id, 'circle-opacity', 0); } catch {}
+          try { map.setPaintProperty(id, 'text-opacity', 0); } catch {}
+          try { map.setPaintProperty(id, 'icon-opacity', 0); } catch {}
+        }
+      }
+
+      style.layers.forEach(layer => {
+        if (/directions-.*waypoint|origin|destination/i.test(layer.id)) {
+          try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch {}
+          if (layer.type === 'circle') {
+            try { map.setPaintProperty(layer.id, 'circle-opacity', 0); } catch {}
+          }
+          if (layer.type === 'symbol') {
+            try { map.setPaintProperty(layer.id, 'text-opacity', 0); } catch {}
+            try { map.setPaintProperty(layer.id, 'icon-opacity', 0); } catch {}
+          }
+        }
+      });
+    }
+
+    async function drawTrafficColoredRoute(originLngLat, destLngLat) {
+      const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${originLngLat[0]},${originLngLat[1]};${destLngLat[0]},${destLngLat[1]}`);
+      url.searchParams.set('geometries', 'geojson');
+      url.searchParams.set('overview', 'full');
+      url.searchParams.set('steps', 'false');
+      url.searchParams.set('annotations', 'congestion');
+      url.searchParams.set('access_token', mapboxgl.accessToken);
+
+      const resp = await fetch(url.toString());
+      if (!resp.ok) throw new Error(`Directions annotations request failed: ${resp.status}`);
+      const data = await resp.json();
+      const r = data?.routes?.[0];
+      if (!r || !r.geometry || !r.legs?.length) throw new Error('No route geometry/legs for annotations');
+
+      const coords = r.geometry.coordinates; 
+      const features = [];
+      let coordIndex = 0;
+
+      for (const leg of r.legs) {
+        const cong = leg.annotation?.congestion;
+        if (!cong || !Array.isArray(cong) || cong.length === 0) continue;
+
+        for (let i = 0; i < cong.length; i++) {
+          const p1 = coords[coordIndex + i];
+          const p2 = coords[coordIndex + i + 1];
+          if (!p1 || !p2) continue;
+          features.push({
+            type: 'Feature',
+            properties: { congestion: cong[i] || 'unknown' },
+            geometry: { type: 'LineString', coordinates: [p1, p2] }
+          });
+        }
+        coordIndex += cong.length;
+      }
+
+      if (features.length === 0 && coords.length > 1) {
+        features.push({
+          type: 'Feature',
+          properties: { congestion: 'unknown' },
+          geometry: { type: 'LineString', coordinates: coords }
+        });
+      }
+
+      const fc = { type: 'FeatureCollection', features };
+      const sourceId = 'route-traffic';
+      const layerId = 'route-traffic-layer';
+
+      const colorExpr = [
+        'match',
+        ['get', 'congestion'],
+        'low',     '#2DC04B',   // green
+        'moderate','#FFD21E',   // yellow
+        'heavy',   '#FF8C1A',   // orange
+        'severe',  '#E53935',   // red
+        /* other */ '#9e9e9e'   // gray for unknown
+      ];
+
+      if (map.getSource(sourceId)) {
+        map.getSource(sourceId).setData(fc);
+      } else {
+        map.addSource(sourceId, { type: 'geojson', data: fc });
+      }
+
+      if (!map.getLayer(layerId)) {
+        map.addLayer({
+          id: layerId,
+          type: 'line',
+          source: sourceId,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': colorExpr, 'line-width': 7, 'line-opacity': 0.95 }
+        });
+        try { map.moveLayer(layerId); } catch {}
+      }
+    }
+  </script>
 </body>
 </html>
