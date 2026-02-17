@@ -15,7 +15,7 @@ def _id_arg(id_value):
         return id_value
 
 
-def _call_delete_proc(proc_name, id_value, conn=None):
+def _call_delete_proc(proc_name, tenant_id, id_value, conn=None):
     """
     Helper to call a delete stored procedure.
 
@@ -27,61 +27,67 @@ def _call_delete_proc(proc_name, id_value, conn=None):
     if arg is None:
         raise ValueError("id is required")
 
+    should_close = False
     if conn is None:
         conn = get_db()
+        should_close = True
     
-    cur = conn.cursor(dictionary=True)
+    try:
+        cur = conn.cursor(dictionary=True)
 
-    cur.callproc(proc_name, [arg])
+        cur.callproc(proc_name, [tenant_id, arg])
 
-    rows = []
-    for r in cur.stored_results():
-        rows.extend(r.fetchall())
+        rows = []
+        for r in cur.stored_results():
+            rows.extend(r.fetchall())
 
-    conn.commit()
-    cur.close()
-    return rows
-
-
-def delete_location(location_id, conn=None):
-    return _call_delete_proc("delete_location", location_id, conn=conn)
-
-
-def delete_product_master(product_code, conn=None):
-    return _call_delete_proc("delete_product_master", product_code, conn=conn)
+        conn.commit()
+        cur.close()
+        return rows
+    finally:
+        if should_close and conn:
+            conn.close()
 
 
-def delete_driver(driver_id, conn=None):
-    return _call_delete_proc("delete_driver", driver_id, conn=conn)
+def delete_location(tenant_id, location_id, conn=None):
+    return _call_delete_proc("delete_location", tenant_id, location_id, conn=conn)
 
 
-def delete_vehicle(vehicle_id, conn=None):
-    return _call_delete_proc("delete_vehicle", vehicle_id, conn=conn)
+def delete_product_master(tenant_id, product_code, conn=None):
+    return _call_delete_proc("delete_product_master", tenant_id, product_code, conn=conn)
 
 
-def delete_entity(entity_id, conn=None):
-    return _call_delete_proc("delete_entity", entity_id, conn=conn)
+def delete_driver(tenant_id, driver_id, conn=None):
+    return _call_delete_proc("delete_driver", tenant_id, driver_id, conn=conn)
 
 
-def delete_supply(supply_id, conn=None):
-    return _call_delete_proc("delete_supply", supply_id, conn=conn)
+def delete_vehicle(tenant_id, vehicle_id, conn=None):
+    return _call_delete_proc("delete_vehicle", tenant_id, vehicle_id, conn=conn)
 
 
-def delete_demand(demand_id, conn=None):
-    return _call_delete_proc("delete_demand", demand_id, conn=conn)
+def delete_entity(tenant_id, entity_id, conn=None):
+    return _call_delete_proc("delete_entity", tenant_id, entity_id, conn=conn)
 
 
-def delete_route(route_id, conn=None):
-    return _call_delete_proc("delete_route", route_id, conn=conn)
+def delete_supply(tenant_id, supply_id, conn=None):
+    return _call_delete_proc("delete_supply", tenant_id, supply_id, conn=conn)
 
 
-def delete_scenario(scenario_id, conn=None):
-    return _call_delete_proc("delete_scenario", scenario_id, conn=conn)
+def delete_demand(tenant_id, demand_id, conn=None):
+    return _call_delete_proc("delete_demand", tenant_id, demand_id, conn=conn)
 
 
-def delete_manifest_item(manifest_item_id, conn=None):
-    return _call_delete_proc("delete_manifest_item", manifest_item_id, conn=conn)
+def delete_route(tenant_id, route_id, conn=None):
+    return _call_delete_proc("delete_route", tenant_id, route_id, conn=conn)
 
 
-def delete_plan(scenario_id, conn=None):
-    return _call_delete_proc("delete_plan", scenario_id, conn=conn)
+def delete_scenario(tenant_id, scenario_id, conn=None):
+    return _call_delete_proc("delete_scenario", tenant_id, scenario_id, conn=conn)
+
+
+def delete_manifest_item(tenant_id, manifest_item_id, conn=None):
+    return _call_delete_proc("delete_manifest_item", tenant_id, manifest_item_id, conn=conn)
+
+
+def delete_plan(tenant_id, scenario_id, conn=None):
+    return _call_delete_proc("delete_plan", tenant_id, scenario_id, conn=conn)

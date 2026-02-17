@@ -5,12 +5,21 @@ import pandas as pd
 from datetime import date
 
 
-def get_locations():
-    location_data = read.view_locations(columns=['location_id', 'name'])
+def get_locations(tenant_id):
+    location_data = read.view_locations(tenant_id, columns=['location_id', 'name'])
     return location_data
 
 
+def _to_int(x):
+    return int(x) if x not in (None, "") else None
+
+
+def _to_dec(x):
+    return Decimal(str(x)) if x not in (None, "") else None
+
+
 def create_scenario(
+        tenant_id,
         route_id,
         total_revenue,
         vehicle_id = None,
@@ -36,12 +45,6 @@ def create_scenario(
     if total_revenue is None:
         raise ValueError("total_revenue is required")
 
-    def _to_int(x):
-        return int(x) if x not in (None, "") else None
-
-    def _to_dec(x):
-        return Decimal(str(x)) if x not in (None, "") else None
-
     route_id = int(route_id)
     vehicle_id = _to_int(vehicle_id)
     driver_id = _to_int(driver_id)
@@ -51,26 +54,33 @@ def create_scenario(
     if current_gas_price is None:
         current_gas_price = 0.0
 
-
     if run_date in ("", None):
         run_date = date.today()
 
+    should_close = False
     if conn is None:
         conn = get_db()
-    cur = conn.cursor()
+        should_close = True
 
-    args = [
-        route_id,
-        vehicle_id,
-        driver_id,
-        run_date,
-        current_gas_price,
-        total_revenue,
-        0
-    ]
-    result = cur.callproc("create_trip_header", args)
-    conn.commit()
-    cur.close()
+    try:
+        cur = conn.cursor()
+
+        args = [
+            tenant_id,
+            route_id,
+            vehicle_id,
+            driver_id,
+            run_date,
+            current_gas_price,
+            total_revenue,
+            0
+        ]
+        result = cur.callproc("create_trip_header", args)
+        conn.commit()
+        cur.close()
+    finally:
+        if should_close and conn:
+            conn.close()
 
     new_scenario_id = result[-1]
 
@@ -78,6 +88,7 @@ def create_scenario(
 
 
 def update_scenario(
+    tenant_id,
     scenario_id,
     route_id=None,
     total_revenue=None,
@@ -98,38 +109,40 @@ def update_scenario(
     :param run_date: run date (optional)
     :param current_gas_price: gas price (optional)
     """
-    def _to_int(x):
-        return int(x) if x not in (None, "") else None
-
-    def _to_dec(x):
-        return Decimal(str(x)) if x not in (None, "") else None
-
+    should_close = False
     if conn is None:
         conn = get_db()
-    cur = conn.cursor(dictionary=True)
+        should_close = True
 
-    args = [
-        int(scenario_id),
-        _to_int(route_id),
-        _to_int(vehicle_id),
-        _to_int(driver_id),
-        run_date if run_date not in (None, "") else None,
-        _to_dec(current_gas_price),
-        _to_dec(total_revenue),
-    ]
+    try:
+        cur = conn.cursor(dictionary=True)
 
-    cur.callproc("update_trip_header", args)
+        args = [
+            tenant_id,
+            int(scenario_id),
+            _to_int(route_id),
+            _to_int(vehicle_id),
+            _to_int(driver_id),
+            run_date if run_date not in (None, "") else None,
+            _to_dec(current_gas_price),
+            _to_dec(total_revenue),
+        ]
 
-    rows = []
-    for r in cur.stored_results():
-        rows.extend(r.fetchall())
+        cur.callproc("update_trip_header", args)
 
-    conn.commit()
-    cur.close()
-    return rows[0] if rows else None
+        rows = []
+        for r in cur.stored_results():
+            rows.extend(r.fetchall())
+        conn.commit()
+        cur.close()
+        return rows[0] if rows else None
+    finally:
+        if should_close and conn:
+            conn.close()
 
 
 def add_manifest_items(
+        tenant_id,
         scenario_id,
         item_name,
         quantity_loaded,
@@ -137,7 +150,7 @@ def add_manifest_items(
         demand_id = None,
         cost_per_item = None,
         items_per_unit = None,
-        unit_weight = None,
+        unit_weight_lbs = None,
         unit_volume = None,
         price_per_item = None,
         conn = None
@@ -152,81 +165,107 @@ def add_manifest_items(
     :param demand_id: demand id (optional)
     :param cost_per_item: cost per item (optional)
     :param items_per_unit: items per handling unit (optional)
-    :param unit_weight: weight per handling unit (optional)
+    :param unit_weight_lbs: weight per handling unit (optional)
     :param price_per_item: sale price per item (optional)
     """
-    if scenario_id is None or scenario_id == "":
-        raise ValueError("scenario_id is required")
-    if quantity_loaded is None or quantity_loaded == "":
-        raise ValueError("quantity_loaded is required")
-    if item_name is None or item_name == "":
-        raise ValueError("item_name is required")
-    if cost_per_item is None or cost_per_item == "":
-        cost_per_item = 0.0
-    if items_per_unit is None or items_per_unit == "":
-        items_per_unit = 1
-    if unit_weight is None or unit_weight == "":
-        unit_weight = 0.0
-    if unit_volume is None or unit_volume == "":
-        unit_volume = 0.0
-    if price_per_item is None or price_per_item == "":
-        price_per_item = 0.0
+    return create.add_manifest_item(
+        tenant_id=tenant_id,
+        scenario_id=scenario_id,
+        item_name=item_name,
+        quantity_loaded=quantity_loaded,
+        supply_id=supply_id,
+        demand_id=demand_id,
+        snapshot_cost_per_item=cost_per_item,
+        snapshot_items_per_unit=items_per_unit,
+        snapshot_unit_weight=unit_weight_lbs,
+        snapshot_unit_volume=unit_volume,
+        snapshot_price_per_item=price_per_item,
+        conn=conn
+    )
+
+
+def _safe_dec(val, default="0"):
+    """Helper to safely convert values to Decimal, handling None."""
+    return Decimal(str(val)) if val is not None else Decimal(default)
+
+
+def _calculate_line_metrics(row):
+    """
+    Pure function: Calculates extended totals (weight, volume, COGS, revenue) 
+    for a single line item row. Handles key variations (input vs db).
+    """
+    qty = _safe_dec(row.get("quantity_loaded"))
+    items_per_unit = _safe_dec(row.get("items_per_unit"), "1")
     
+    # Standardized on unit_weight_lbs for both DB and Input
+    unit_weight = _safe_dec(row.get("unit_weight_lbs"))
+    unit_volume = _safe_dec(row.get("unit_volume"))
+    cost = _safe_dec(row.get("cost_per_item"))
+    price = _safe_dec(row.get("price_per_item"))
+
+    return {
+        "total_line_weight_lbs": qty * unit_weight,
+        "total_line_volume": qty * unit_volume,
+        "total_line_cogs": qty * items_per_unit * cost,
+        "total_line_revenue": qty * items_per_unit * price
+    }
 
 
-    def _to_int(x):
-        return int(x) if x not in (None, "") else None
-
-    def _to_dec(x):
-        return Decimal(str(x)) if x not in (None, "") else None
-
-    args = [
-        int(scenario_id),
-        _to_int(supply_id),
-        _to_int(demand_id),
-        str(item_name),
-        _to_dec(quantity_loaded),
-        _to_dec(cost_per_item),
-        _to_int(items_per_unit),
-        _to_dec(unit_weight),
-        _to_dec(unit_volume),
-        _to_dec(price_per_item),
-    ]
-
-    if conn is None:
-        conn = get_db()
-    cur = conn.cursor()
-
-    cur.callproc("add_manifest_item", args)
-
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-
-    conn.commit()
-    cur.close()
-
-    return new_id
+def _aggregate_totals(items, entered_revenue):
+    """Pure function: Sums up calculated line items to create scenario totals."""
+    return {
+        "line_item_count": len(items),
+        "total_weight_lbs": sum((i["total_line_weight_lbs"] for i in items), Decimal(0)),
+        "total_volume": sum((i["total_line_volume"] for i in items), Decimal(0)),
+        "total_cogs": sum((i["total_line_cogs"] for i in items), Decimal(0)),
+        "calculated_revenue": sum((i["total_line_revenue"] for i in items), Decimal(0)),
+        "entered_revenue": _safe_dec(entered_revenue)
+    }
 
 
-def get_trip_details(scenario_id, conn=None):
+def calculate_scenario_metrics(items, entered_revenue=0):
+    """
+    Calculates totals for a list of items (e.g. from UI input or DB) 
+    without requiring database interaction.
+    """
+    processed_items = []
+    for item in items:
+        # Calculate metrics using the shared logic
+        metrics = _calculate_line_metrics(item)
+        # Merge metrics back into the item
+        processed_item = {**item, **metrics}
+        processed_items.append(processed_item)
+
+    totals = _aggregate_totals(processed_items, entered_revenue)
+    return {"items": processed_items, "totals": totals}
+
+
+def get_trip_details(tenant_id, scenario_id, conn=None):
     if scenario_id in (None, ""):
         raise ValueError("scenario_id is required")
     scenario_id = int(scenario_id)
 
+    should_close = False
     if conn is None:
         conn = get_db()
-    cur = conn.cursor(dictionary=True)
+        should_close = True
 
-    cur.callproc("get_trip_details", [scenario_id])
+    try:
+        cur = conn.cursor(dictionary=True)
 
-    result_sets = [r.fetchall() for r in cur.stored_results()]
-    cur.close()
+        cur.callproc("get_trip_details", [tenant_id, scenario_id])
+
+        # Only expecting one result set now (raw joined data)
+        result_sets = [r.fetchall() for r in cur.stored_results()]
+        cur.close()
+    finally:
+        if should_close and conn:
+            conn.close()
 
     if not result_sets or not result_sets[0]:
         return None
 
     rows = result_sets[0]
-    totals = result_sets[1][0] if len(result_sets) > 1 and result_sets[1] else {}
 
     header_cols = [
         "scenario_id",
@@ -256,50 +295,26 @@ def get_trip_details(scenario_id, conn=None):
         "unit_volume",
         "cost_per_item",
         "price_per_item",
-        "total_line_weight_lbs",
-        "total_line_volume",
-        "total_line_cogs",
-        "total_line_revenue",
     ]
 
     items = []
     for row in rows:
         if row.get("product_name") is None and row.get("quantity_loaded") is None:
             continue
-        items.append({k: row.get(k) for k in item_cols})
+        
+        # 1. Extract basic data (only keys that exist in the raw row)
+        item_data = {k: row.get(k) for k in item_cols if k in row}
+        
+        # 2. Apply business logic for line totals
+        metrics = _calculate_line_metrics(row)
+        item_data.update(metrics)
+        
+        items.append(item_data)
 
+    # 3. Apply business logic for aggregation
+    totals = _aggregate_totals(items, header.get("entered_revenue"))
+    
     return {"header": header, "items": items, "totals": totals}
-
-
-def trip_details_to_dataframe(trip_details):
-    """
-    Converts get_trip_details() output to a flat DataFrame.
-    Each manifest item becomes one row with repeated header fields.
-    """
-    header = trip_details["header"]
-    items = trip_details["items"]
-
-    if not items:
-        return pd.DataFrame([header])
-
-    rows = []
-    for item in items:
-        row = {}
-        row.update(header)
-        row.update(item)
-        rows.append(row)
-
-    return pd.DataFrame(rows)
-
-
-# def export_trip_csv(scenario_id, path):
-#     trip_details = get_trip_details(scenario_id)
-#     if trip_details is None:
-#         raise ValueError("Scenario not found")
-
-#     df = trip_details_to_dataframe(trip_details)
-
-#     df.to_csv(path, index=False)
 
 
 def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0):
@@ -375,11 +390,12 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0):
     }
 
 
-def export_trip_csv(trip_details, path):
+def export_trip_csv(trip_details, output_handle):
     """
     Writes a two-section CSV using pre-fetched trip_details:
       - TRIP_COSTS (one row)
       - LINE_ITEMS (per-product rows)
+    :param output_handle: File path (str) or file-like object (stream)
     """
     if not trip_details:
         raise ValueError("No trip details provided")
@@ -407,10 +423,19 @@ def export_trip_csv(trip_details, path):
     if not items_df.empty:
         items_df = items_df[[c for c in item_cols if c in items_df.columns]]
 
-        with open(path, "w", newline="", encoding="utf-8") as f:
+        should_close = False
+        if isinstance(output_handle, str):
+            f = open(output_handle, "w", newline="", encoding="utf-8")
+            should_close = True
+        else:
+            f = output_handle
+
+        try:
             f.write("TRIP_COSTS\n")
             costs_df.to_csv(f, index=False)
-
             f.write("\n")
             f.write("LINE_ITEMS\n")
             items_df.to_csv(f, index=False)
+        finally:
+            if should_close:
+                f.close()

@@ -4,7 +4,7 @@ DELIMITER $$
 
 DROP PROCEDURE IF EXISTS get_planning_assets$$
 
-CREATE PROCEDURE get_planning_assets()
+CREATE PROCEDURE get_planning_assets(IN p_tenant_id INT)
 BEGIN
     -- 1. AVAILABLE SUPPLY (The "Pick List")
     SELECT 
@@ -22,9 +22,9 @@ BEGIN
         s.items_per_handling_unit, 
         s.cost_per_item            
     FROM supply s
-    JOIN locations l ON s.location_id = l.location_id
-    JOIN products_master p ON s.product_code = p.product_code
-    WHERE s.quantity_available > 0;
+    JOIN locations l ON s.location_id = l.location_id AND l.tenant_id = p_tenant_id
+    JOIN products_master p ON s.product_code = p.product_code AND p.tenant_id = p_tenant_id
+    WHERE s.quantity_available > 0 AND s.tenant_id = p_tenant_id;
 
     -- 2. OPEN DEMAND (The "Destinations")
     SELECT 
@@ -35,24 +35,25 @@ BEGIN
         d.quantity_needed,
         d.max_price
     FROM demand d
-    JOIN locations l ON d.location_id = l.location_id
-    JOIN products_master p ON d.product_code = p.product_code;
+    JOIN locations l ON d.location_id = l.location_id AND l.tenant_id = p_tenant_id
+    JOIN products_master p ON d.product_code = p.product_code AND p.tenant_id = p_tenant_id
+    WHERE d.tenant_id = p_tenant_id;
 
     -- 3. VEHICLES (Constraints & Costs)
     SELECT 
         vehicle_id, name, 
         max_weight_lbs, max_volume_cubic_ft, storage_capability,
         mpg, depreciation_per_mile, annual_insurance_cost
-    FROM vehicles;
+    FROM vehicles WHERE tenant_id = p_tenant_id;
 
     -- 4. DRIVERS (Wage Rates)
     SELECT 
         driver_id, name, 
         hourly_drive_wage, hourly_load_wage 
-    FROM drivers;
+    FROM drivers WHERE tenant_id = p_tenant_id;
 
     -- 5. ROUTES (The Map)
-    SELECT route_id, name, origin_location_id, dest_location_id FROM routes;
+    SELECT route_id, name, origin_location_id, dest_location_id FROM routes WHERE tenant_id = p_tenant_id;
 
     -- 6. LOCATIONS (Time & Space)
     -- Python uses Lat/Long for distance, and Avg Mins for time calc.
@@ -61,7 +62,7 @@ BEGIN
         latitude, longitude,
         avg_load_minutes,   -- NEW: Estimate loading time
         avg_unload_minutes  -- NEW: Estimate unloading time
-    FROM locations;
+    FROM locations WHERE tenant_id = p_tenant_id;
 
 END$$
 

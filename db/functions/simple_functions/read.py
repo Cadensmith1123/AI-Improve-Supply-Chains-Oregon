@@ -1,4 +1,5 @@
 from ..connect import get_db
+import re
 
 """simple read functions that return all entries from all columns with no 
 arguments or allows for list of columns and number of entries. Also allows 
@@ -16,6 +17,14 @@ def _cols_arg(columns):
         return None
     if not isinstance(columns, (list, tuple)):
         raise ValueError("columns must be a list or None")
+
+    # Security: Validate column names to prevent SQL injection
+    # Allow alphanumeric, underscores, and backticks
+    valid_col_pattern = re.compile(r"^[a-zA-Z0-9_`]+$")
+    for col in columns:
+        if not valid_col_pattern.match(col):
+            raise ValueError(f"Invalid column name: {col}")
+
     return ", ".join(columns) if columns else None
 
 
@@ -43,15 +52,24 @@ def _ids_arg(ids):
     if ids is None:
         return None
 
-    if isinstance(ids, (list, tuple)):
-        if not ids:
-            return None
-        return ",".join(str(i) for i in ids)
+    if not isinstance(ids, (list, tuple)):
+        ids = [ids]
 
-    return str(ids)
+    if not ids:
+        return None
+
+    # Quote strings, leave numbers as is
+    formatted = []
+    for i in ids:
+        if isinstance(i, str):
+            val = i.replace("'", "''")
+            formatted.append(f"'{val}'")
+        else:
+            formatted.append(str(i))
+    return ",".join(formatted)
 
 
-def _call_view_proc(proc_name, conn=get_db(), columns=None, limit=None, ids=None):
+def _call_view_proc(proc_name, tenant_id, conn=None, columns=None, limit=None, ids=None):
     """
     Helper to format proc calls then request data from MYSQL
     
@@ -60,57 +78,67 @@ def _call_view_proc(proc_name, conn=get_db(), columns=None, limit=None, ids=None
     :param limit: number of records to return or none
     :param ids: list of ids or none
     """
-    cur = conn.cursor(dictionary=True)
+    should_close = False
+    if conn is None:
+        conn = get_db()
+        should_close = True
 
-    cur.callproc(proc_name, [
-        _cols_arg(columns),
-        _limit_arg(limit),
-        _ids_arg(ids),
-    ])
+    try:
+        cur = conn.cursor(dictionary=True)
 
-    rows = []
-    for r in cur.stored_results():
-        rows.extend(r.fetchall())
+        cur.callproc(proc_name, [
+            tenant_id,
+            _cols_arg(columns),
+            _limit_arg(limit),
+            _ids_arg(ids),
+        ])
 
-    cur.close()
-    return rows
+        rows = []
+        for r in cur.stored_results():
+            rows.extend(r.fetchall())
 
-
-def view_locations(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_locations", conn, columns, limit, ids)
-
-
-def view_products_master(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_products_master", conn, columns, limit, ids)
-
-
-def view_drivers(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_drivers", conn, columns, limit, ids)
+        cur.close()
+        return rows
+    finally:
+        if should_close and conn:
+            conn.close()
 
 
-def view_vehicles(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_vehicles", conn, columns, limit, ids)
+def view_locations(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_locations", tenant_id, conn, columns, limit, ids)
 
 
-def view_entities(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_entities", conn, columns, limit, ids)
+def view_products_master(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_products_master", tenant_id, conn, columns, limit, ids)
 
 
-def view_supply(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_supply", conn, columns, limit, ids)
+def view_drivers(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_drivers", tenant_id, conn, columns, limit, ids)
 
 
-def view_demand(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_demand", conn, columns, limit, ids)
+def view_vehicles(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_vehicles", tenant_id, conn, columns, limit, ids)
 
 
-def view_routes(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_routes", conn, columns, limit, ids)
+def view_entities(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_entities", tenant_id, conn, columns, limit, ids)
 
 
-def view_scenarios(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_scenarios", conn, columns, limit, ids)
+def view_supply(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_supply", tenant_id, conn, columns, limit, ids)
 
 
-def view_manifest_items(conn=get_db(), columns=None, limit=None, ids=None):
-    return _call_view_proc("view_manifest_items", conn, columns, limit, ids)
+def view_demand(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_demand", tenant_id, conn, columns, limit, ids)
+
+
+def view_routes(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_routes", tenant_id, conn, columns, limit, ids)
+
+
+def view_scenarios(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_scenarios", tenant_id, conn, columns, limit, ids)
+
+
+def view_manifest_items(tenant_id, conn=None, columns=None, limit=None, ids=None):
+    return _call_view_proc("view_manifest_items", tenant_id, conn, columns, limit, ids)

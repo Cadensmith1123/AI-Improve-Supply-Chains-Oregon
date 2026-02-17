@@ -1,4 +1,4 @@
-from ..connect import get_db
+from ..connect import get_db, execute_creation_proc
 from decimal import Decimal
 
 LOCATION_TYPES = {"Hub", "Store", "Farm"}
@@ -7,6 +7,7 @@ VEHICLE_STORAGE_TYPES = {"Dry", "Ref", "Frz", "Multi"}
 
 
 def add_location(
+    tenant_id,
     name, type, address_street, city, state, zip_code, phone,
     latitude, longitude, avg_load_minutes, avg_unload_minutes,
     conn=None
@@ -14,133 +15,75 @@ def add_location(
     if type not in LOCATION_TYPES:
         raise ValueError(f"Invalid location type: {type}")
 
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_location", [
+    args = [
+        tenant_id,
         name, type, address_street, city, state, zip_code, phone,
         latitude, longitude, avg_load_minutes, avg_unload_minutes
-    ])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+    ]
+    return execute_creation_proc("add_location", args, conn)
 
 
-def add_product_master(product_code, name, storage_type, conn=None):
+def add_product_master(tenant_id, product_code, name, storage_type, conn=None):
     if storage_type not in STORAGE_TYPES:
         raise ValueError(f"Invalid storage type: {storage_type}")
 
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_product_master", [product_code, name, storage_type])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+    args = [tenant_id, product_code, name, storage_type]
+    return execute_creation_proc("add_product_master", args, conn)
 
 
-def add_driver(name, hourly_drive_wage, hourly_load_wage, conn=None):
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_driver", [name, hourly_drive_wage, hourly_load_wage])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+def add_driver(tenant_id, name, hourly_drive_wage, hourly_load_wage, conn=None):
+    args = [tenant_id, name, hourly_drive_wage, hourly_load_wage]
+    return execute_creation_proc("add_driver", args, conn)
 
 
 def add_vehicle(
-    name, mpg, depreciation_per_mile, annual_insurance_cost,
+    tenant_id,
+    name, mpg, depreciation_per_mile, annual_insurance_cost, annual_maintenance_cost,
     max_weight_lbs, max_volume_cubic_ft, storage_type,
     conn=None
     ):
     if storage_type not in VEHICLE_STORAGE_TYPES:
         raise ValueError(f"Invalid vehicle storage type: {storage_type}")
 
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_vehicle", [
+    args = [
+        tenant_id,
         name, mpg, depreciation_per_mile, annual_insurance_cost,
-        max_weight_lbs, max_volume_cubic_ft, storage_type
-    ])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+        annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type
+    ]
+    return execute_creation_proc("add_vehicle", args, conn)
 
 
-def add_entity(name, entity_min_profit, conn=None):
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_entity", [name, entity_min_profit])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+def add_entity(tenant_id, name, entity_min_profit, conn=None):
+    args = [tenant_id, name, entity_min_profit]
+    return execute_creation_proc("add_entity", args, conn)
 
 
 def add_supply(
+    tenant_id,
     entity_id, location_id, product_code, quantity_available,
     unit_weight_lbs, unit_volume_cu_ft, items_per_handling_unit, cost_per_item,
     conn=None
 ):
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_supply", [
+    args = [
+        tenant_id,
         entity_id, location_id, product_code, quantity_available,
         unit_weight_lbs, unit_volume_cu_ft, items_per_handling_unit, cost_per_item
-    ])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+    ]
+    return execute_creation_proc("add_supply", args, conn)
 
 
-def add_demand(location_id, product_code, quantity_needed, max_price, conn=None):
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_demand", [location_id, product_code, quantity_needed, max_price])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+def add_demand(tenant_id, location_id, product_code, quantity_needed, max_price, conn=None):
+    args = [tenant_id, location_id, product_code, quantity_needed, max_price]
+    return execute_creation_proc("add_demand", args, conn)
 
 
-def add_route(name, origin_location_id, dest_location_id, conn=None):
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_route", [name, origin_location_id, dest_location_id])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+def add_route(tenant_id, name, origin_location_id, dest_location_id, conn=None):
+    args = [tenant_id, name, origin_location_id, dest_location_id]
+    return execute_creation_proc("add_route", args, conn)
 
 
 def add_scenario(
+    tenant_id,
     route_id, vehicle_id, driver_id, run_date,
     snapshot_driver_wage, snapshot_driver_load_wage,
     snapshot_vehicle_mpg, snapshot_gas_price,
@@ -149,26 +92,20 @@ def add_scenario(
     actual_load_minutes, actual_unload_minutes, snapshot_total_revenue,
     conn=None
 ):
-    if conn is None:
-        conn = get_db()
-
-    cur = conn.cursor()
-    cur.callproc("add_scenario", [
+    args = [
+        tenant_id,
         route_id, vehicle_id, driver_id, run_date,
         snapshot_driver_wage, snapshot_driver_load_wage,
         snapshot_vehicle_mpg, snapshot_gas_price,
         snapshot_daily_insurance, snapshot_daily_maintenance_cost,
         snapshot_planned_load_minutes, snapshot_planned_unload_minutes,
         actual_load_minutes, actual_unload_minutes, snapshot_total_revenue
-    ])
-    for r in cur.stored_results():
-        new_id = r.fetchone()[0]
-    conn.commit()
-    cur.close()
-    return new_id
+    ]
+    return execute_creation_proc("add_scenario", args, conn)
 
 
 def add_manifest_item(
+    tenant_id,
     scenario_id,
     item_name,
     quantity_loaded,
@@ -194,10 +131,8 @@ def add_manifest_item(
     def _to_dec(x):
         return Decimal(str(x)) if x not in (None, "") else Decimal("0")
 
-    if conn is None:
-        conn = get_db()
-
     args = [
+        tenant_id,
         int(scenario_id),              # p_scenario_id
         _to_int(supply_id),            # p_supply_id
         _to_int(demand_id),            # p_demand_id
@@ -210,17 +145,7 @@ def add_manifest_item(
         _to_dec(snapshot_price_per_item),
     ]
 
-    cur = conn.cursor()
-    cur.callproc("add_manifest_item", args)
-
-    new_id = None
-    for r in cur.stored_results():
-        row = r.fetchone()
-        if row:
-            new_id = row[0]
-
-    conn.commit()
-    cur.close()
+    new_id = execute_creation_proc("add_manifest_item", args, conn)
 
     if new_id is None:
         raise RuntimeError("add_manifest_item did not return new_id")

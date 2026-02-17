@@ -1,196 +1,248 @@
--- =============================================
--- LOCAL FOOD OPTIMIZATION SCHEMA
--- Database Name: local_food_db
--- =============================================
-
-DROP SCHEMA IF EXISTS local_food_db;
-CREATE SCHEMA local_food_db;
+DROP DATABASE IF EXISTS local_food_db;
+CREATE DATABASE local_food_db;
 USE local_food_db;
 
-SET FOREIGN_KEY_CHECKS = 0;
-
--- =============================================
--- 1. INFRASTRUCTURE & MASTER DATA
--- =============================================
+-- 1. Locations
 CREATE TABLE locations (
-    location_id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL, 
-    type ENUM('Hub', 'Store', 'Farm') DEFAULT 'Hub',
-    
+    tenant_id INT NOT NULL,
+    location_id INT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    type ENUM('Hub', 'Store', 'Farm') NOT NULL,
     address_street VARCHAR(255),
     city VARCHAR(100),
-    state VARCHAR(50), 
-    zip VARCHAR(20),   
-    phone VARCHAR(20), 
-    
-    latitude DECIMAL(9,6),  
-    longitude DECIMAL(9,6),
-    
+    state VARCHAR(50),
+    zip_code VARCHAR(20),
+    phone VARCHAR(20),
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
     avg_load_minutes INT DEFAULT 30,
-    avg_unload_minutes INT DEFAULT 30
+    avg_unload_minutes INT DEFAULT 30,
+    
+    PRIMARY KEY (tenant_id, location_id),
+    KEY (location_id) -- Required for AUTO_INCREMENT
 );
 
+-- 2. Products Master
 CREATE TABLE products_master (
-    product_code VARCHAR(50) PRIMARY KEY, 
+    tenant_id INT NOT NULL,
+    product_code VARCHAR(50) NOT NULL,
     name VARCHAR(100) NOT NULL,
-    storage_type ENUM('Dry', 'Ref', 'Frz') NOT NULL
+    storage_type ENUM('Dry', 'Ref', 'Frz') NOT NULL,
+
+    PRIMARY KEY (tenant_id, product_code)
 );
 
--- =============================================
--- 2. ASSETS
--- =============================================
+-- 3. Drivers
 CREATE TABLE drivers (
-    driver_id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    driver_id INT NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
-    hourly_drive_wage DECIMAL(5,2) NOT NULL,
-    hourly_load_wage DECIMAL(5,2) NOT NULL
+    hourly_drive_wage DECIMAL(5, 2) NOT NULL,
+    hourly_load_wage DECIMAL(5, 2) NOT NULL,
+
+    PRIMARY KEY (tenant_id, driver_id),
+    KEY (driver_id)
 );
 
+-- 4. Vehicles
 CREATE TABLE vehicles (
-    vehicle_id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    vehicle_id INT NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
-    
-    mpg DECIMAL(4,1) NOT NULL,
-    depreciation_per_mile DECIMAL(10,2) NOT NULL,
-    
-    annual_insurance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    annual_maintenance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    mpg DECIMAL(4, 1) NOT NULL,
+    depreciation_per_mile DECIMAL(5, 3) DEFAULT 0.000,
+    annual_insurance_cost DECIMAL(10, 2) DEFAULT 0.00,
+    annual_maintenance_cost DECIMAL(10, 2) DEFAULT 0.00,
+    max_weight_lbs DECIMAL(10, 2) NOT NULL,
+    max_volume_cubic_ft DECIMAL(10, 2) NOT NULL,
+    storage_type ENUM('Dry', 'Ref', 'Frz', 'Multi') NOT NULL,
 
-
-    max_weight_lbs INT NOT NULL,
-    max_volume_cubic_ft INT NOT NULL,
-    storage_capability ENUM('Dry', 'Ref', 'Frz', 'Multi') NOT NULL
+    PRIMARY KEY (tenant_id, vehicle_id),
+    KEY (vehicle_id)
 );
 
--- =============================================
--- 3. BUSINESS ENTITIES
--- =============================================
+-- 5. Entities (Owners of supply)
 CREATE TABLE entities (
-    entity_id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    entity_id INT NOT NULL AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL,
-    
-    entity_min_profit INT DEFAULT 0
+    entity_min_profit DECIMAL(10, 2) DEFAULT 0.00,
+
+    PRIMARY KEY (tenant_id, entity_id),
+    KEY (entity_id)
 );
 
--- =============================================
--- 4. SUPPLY
--- =============================================
+-- 6. Supply
 CREATE TABLE supply (
-    supply_id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    supply_id INT NOT NULL AUTO_INCREMENT,
     entity_id INT NOT NULL,
     location_id INT NOT NULL,
     product_code VARCHAR(50) NOT NULL,
-    
-    -- LOGISTICS UNIT
-    quantity_available DECIMAL(10,2) NOT NULL, -- e.g. "5" (crates)
-    
-    -- PER HANDLING UNIT INFO
-    unit_weight_lbs DECIMAL(8,2) NOT NULL,     -- e.g. crate weighs 50 lbs
-    unit_volume_cu_ft DECIMAL(8,2) NOT NULL,   -- e.g. crate is 5 cubic feet
-    
-    -- PER SALE UNIT INFO
-    items_per_handling_unit INT NOT NULL DEFAULT 1, -- e.g. 48 (Cases inside)
-    cost_per_item DECIMAL(10,2) NOT NULL,           -- e.g. $20 (per Case cost to manufacture/for hub)
+    quantity_available DECIMAL(10, 2) NOT NULL,
+    unit_weight_lbs DECIMAL(10, 2) DEFAULT 0.00,
+    unit_volume_cu_ft DECIMAL(10, 2) DEFAULT 0.00,
+    items_per_handling_unit INT DEFAULT 1,
+    cost_per_item DECIMAL(10, 2) DEFAULT 0.00,
 
-    FOREIGN KEY (entity_id) REFERENCES entities(entity_id) ON DELETE RESTRICT,
-    FOREIGN KEY (location_id) REFERENCES locations(location_id) ON DELETE RESTRICT,
-    FOREIGN KEY (product_code) REFERENCES products_master(product_code) ON DELETE RESTRICT
+    PRIMARY KEY (tenant_id, supply_id),
+    KEY (supply_id),
+    FOREIGN KEY (tenant_id, entity_id) REFERENCES entities(tenant_id, entity_id),
+    FOREIGN KEY (tenant_id, location_id) REFERENCES locations(tenant_id, location_id),
+    FOREIGN KEY (tenant_id, product_code) REFERENCES products_master(tenant_id, product_code)
 );
 
--- =============================================
--- 5. DEMAND
--- =============================================
+-- 7. Demand
 CREATE TABLE demand (
-    demand_id INT AUTO_INCREMENT PRIMARY KEY,
-    location_id INT NOT NULL, 
+    tenant_id INT NOT NULL,
+    demand_id INT NOT NULL AUTO_INCREMENT,
+    location_id INT NOT NULL,
     product_code VARCHAR(50) NOT NULL,
-    
-    quantity_needed DECIMAL(10,2) NOT NULL,
-    max_price DECIMAL(10,2) NOT NULL, 
-    
-    FOREIGN KEY (location_id) REFERENCES locations(location_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_code) REFERENCES products_master(product_code) ON DELETE CASCADE
+    quantity_needed DECIMAL(10, 2) NOT NULL,
+    max_price DECIMAL(10, 2) DEFAULT 0.00,
+
+    PRIMARY KEY (tenant_id, demand_id),
+    KEY (demand_id),
+    FOREIGN KEY (tenant_id, location_id) REFERENCES locations(tenant_id, location_id),
+    FOREIGN KEY (tenant_id, product_code) REFERENCES products_master(tenant_id, product_code)
 );
 
--- =============================================
--- 6. OPERATIONS & SNAPSHOTS
--- =============================================
+-- 8. Routes
 CREATE TABLE routes (
-    route_id INT AUTO_INCREMENT PRIMARY KEY,
+    tenant_id INT NOT NULL,
+    route_id INT NOT NULL AUTO_INCREMENT,
     name VARCHAR(100),
     origin_location_id INT NOT NULL,
     dest_location_id INT NOT NULL,
-    FOREIGN KEY (origin_location_id) REFERENCES locations(location_id) ON DELETE RESTRICT,
-    FOREIGN KEY (dest_location_id) REFERENCES locations(location_id) ON DELETE RESTRICT
+
+    PRIMARY KEY (tenant_id, route_id),
+    KEY (route_id),
+    FOREIGN KEY (tenant_id, origin_location_id) REFERENCES locations(tenant_id, location_id),
+    FOREIGN KEY (tenant_id, dest_location_id) REFERENCES locations(tenant_id, location_id)
 );
 
+-- 9. Scenarios (Trip Headers)
 CREATE TABLE scenarios (
-    scenario_id INT AUTO_INCREMENT PRIMARY KEY,
-    route_id INT,        
+    tenant_id INT NOT NULL,
+    scenario_id INT NOT NULL AUTO_INCREMENT,
+    route_id INT NOT NULL,
     vehicle_id INT,
     driver_id INT,
     run_date DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    snapshot_driver_wage DECIMAL(5,2) DEFAULT 0.00,
-    snapshot_driver_load_wage DECIMAL(5,2) DEFAULT 0.00,
-    snapshot_vehicle_mpg DECIMAL(4,1) DEFAULT 0,
-    snapshot_gas_price DECIMAL(4,2) DEFAULT 0.00,
-    snapshot_daily_insurance DECIMAL(10,2) DEFAULT 0.00,
-    snapshot_daily_maintenance_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    -- Snapshots
+    snapshot_driver_wage DECIMAL(5, 2),
+    snapshot_driver_load_wage DECIMAL(5, 2),
+    snapshot_vehicle_mpg DECIMAL(4, 1),
+    snapshot_gas_price DECIMAL(6, 3),
+    snapshot_daily_insurance DECIMAL(10, 2),
+    snapshot_daily_maintenance_cost DECIMAL(10, 2),
+    snapshot_planned_load_minutes INT,
+    snapshot_planned_unload_minutes INT,
     
-    snapshot_planned_load_minutes INT NOT NULL DEFAULT 0.00,
-    snapshot_planned_unload_minutes INT NOT NULL DEFAULT 0.00,
+    actual_load_minutes INT DEFAULT 0,
+    actual_unload_minutes INT DEFAULT 0,
+    snapshot_total_revenue DECIMAL(12, 2) DEFAULT 0.00,
 
-    actual_load_minutes INT DEFAULT NULL,
-    actual_unload_minutes INT DEFAULT NULL,
-    
-    snapshot_total_revenue DECIMAL(10,2) NOT NULL,
-    
-    FOREIGN KEY (route_id) REFERENCES routes(route_id) ON DELETE SET NULL,
-    FOREIGN KEY (vehicle_id) REFERENCES vehicles(vehicle_id) ON DELETE SET NULL,
-    FOREIGN KEY (driver_id) REFERENCES drivers(driver_id) ON DELETE SET NULL
+    PRIMARY KEY (tenant_id, scenario_id),
+    KEY (scenario_id),
+    FOREIGN KEY (tenant_id, route_id) REFERENCES routes(tenant_id, route_id),
+    FOREIGN KEY (tenant_id, vehicle_id) REFERENCES vehicles(tenant_id, vehicle_id),
+    FOREIGN KEY (tenant_id, driver_id) REFERENCES drivers(tenant_id, driver_id)
 );
 
+-- 10. Manifest Items (Trip Lines)
 CREATE TABLE manifest_items (
-    manifest_item_id INT AUTO_INCREMENT PRIMARY KEY,
-    item_name VARCHAR(100),
+    tenant_id INT NOT NULL,
+    manifest_item_id INT NOT NULL AUTO_INCREMENT,
     scenario_id INT NOT NULL,
     supply_id INT,
-    demand_id INT, 
+    demand_id INT,
     
-    quantity_loaded DECIMAL(10,2) NOT NULL,
+    item_name VARCHAR(100),
+    quantity_loaded DECIMAL(10, 2),
     
-    snapshot_cost_per_item DECIMAL(10,2) NOT NULL,
-    snapshot_items_per_unit INT NOT NULL, 
-    snapshot_unit_weight DECIMAL(8,2) NOT NULL,
-    snapshot_unit_volume DECIMAL(8,2) NOT NULL DEFAULT 0,
-    snapshot_price_per_item DECIMAL(10,2) NOT NULL,
+    -- Snapshots
+    snapshot_cost_per_item DECIMAL(10, 2),
+    snapshot_items_per_unit INT,
+    snapshot_unit_weight DECIMAL(10, 2),
+    snapshot_unit_volume DECIMAL(10, 2),
+    snapshot_price_per_item DECIMAL(10, 2),
 
-    FOREIGN KEY (scenario_id) REFERENCES scenarios(scenario_id) ON DELETE CASCADE,
-    FOREIGN KEY (supply_id) REFERENCES supply(supply_id) ON DELETE RESTRICT,
-    FOREIGN KEY (demand_id) REFERENCES demand(demand_id) ON DELETE SET NULL
+    PRIMARY KEY (tenant_id, manifest_item_id),
+    KEY (manifest_item_id),
+    FOREIGN KEY (tenant_id, scenario_id) REFERENCES scenarios(tenant_id, scenario_id) ON DELETE CASCADE,
+    FOREIGN KEY (tenant_id, supply_id) REFERENCES supply(tenant_id, supply_id),
+    FOREIGN KEY (tenant_id, demand_id) REFERENCES demand(tenant_id, demand_id)
 );
 
--- =============================================
--- 7. TRIGGERS
--- =============================================
+-- 11. Triggers for Inventory Management
 DELIMITER $$
 
-CREATE TRIGGER trg_manifest_insert
-AFTER INSERT ON manifest_items FOR EACH ROW
+CREATE TRIGGER trg_manifest_insert AFTER INSERT ON manifest_items
+FOR EACH ROW
 BEGIN
-    UPDATE supply SET quantity_available = quantity_available - NEW.quantity_loaded
-    WHERE supply_id = NEW.supply_id;
-END$$
+    -- Update Supply
+    IF NEW.supply_id IS NOT NULL AND NEW.supply_id != 0 THEN
+        UPDATE supply 
+        SET quantity_available = quantity_available - NEW.quantity_loaded
+        WHERE supply_id = NEW.supply_id AND tenant_id = NEW.tenant_id;
+    END IF;
 
-CREATE TRIGGER trg_manifest_delete
-AFTER DELETE ON manifest_items FOR EACH ROW
+    -- Update Demand
+    IF NEW.demand_id IS NOT NULL AND NEW.supply_id != 0 THEN
+        UPDATE demand 
+        SET quantity_needed = quantity_needed - NEW.quantity_loaded
+        WHERE demand_id = NEW.demand_id AND tenant_id = NEW.tenant_id;
+    END IF;
+END $$
+
+CREATE TRIGGER trg_manifest_update AFTER UPDATE ON manifest_items
+FOR EACH ROW
 BEGIN
-    UPDATE supply SET quantity_available = quantity_available + OLD.quantity_loaded
-    WHERE supply_id = OLD.supply_id;
-END$$
+    -- Revert Old Supply
+    IF OLD.supply_id IS NOT NULL AND NEW.demand_id != 0 THEN
+        UPDATE supply 
+        SET quantity_available = quantity_available + OLD.quantity_loaded
+        WHERE supply_id = OLD.supply_id AND tenant_id = OLD.tenant_id;
+    END IF;
+    -- Apply New Supply
+    IF NEW.supply_id IS NOT NULL AND NEW.demand_id != 0 THEN
+        UPDATE supply 
+        SET quantity_available = quantity_available - NEW.quantity_loaded
+        WHERE supply_id = NEW.supply_id AND tenant_id = NEW.tenant_id;
+    END IF;
+
+    -- Revert Old Demand
+    IF OLD.demand_id IS NOT NULL AND NEW.demand_id != 0 THEN
+        UPDATE demand 
+        SET quantity_needed = quantity_needed + OLD.quantity_loaded
+        WHERE demand_id = OLD.demand_id AND tenant_id = OLD.tenant_id;
+    END IF;
+    -- Apply New Demand
+    IF NEW.demand_id IS NOT NULL AND NEW.demand_id != 0 THEN
+        UPDATE demand 
+        SET quantity_needed = quantity_needed - NEW.quantity_loaded
+        WHERE demand_id = NEW.demand_id AND tenant_id = NEW.tenant_id;
+    END IF;
+END $$
+
+CREATE TRIGGER trg_manifest_delete AFTER DELETE ON manifest_items
+FOR EACH ROW
+BEGIN
+    -- Restore Supply
+    IF OLD.supply_id IS NOT NULL THEN
+        UPDATE supply 
+        SET quantity_available = quantity_available + OLD.quantity_loaded
+        WHERE supply_id = OLD.supply_id AND tenant_id = OLD.tenant_id;
+    END IF;
+
+    -- Restore Demand
+    IF OLD.demand_id IS NOT NULL THEN
+        UPDATE demand 
+        SET quantity_needed = quantity_needed + OLD.quantity_loaded
+        WHERE demand_id = OLD.demand_id AND tenant_id = OLD.tenant_id;
+    END IF;
+END $$
 
 DELIMITER ;
-
-SET FOREIGN_KEY_CHECKS = 1;
