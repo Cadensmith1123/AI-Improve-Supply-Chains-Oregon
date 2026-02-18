@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>{% if mode == 'new' %}New Product{% else %}Edit Product{% endif %}</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; }
+    .card { max-width: 700px; border: 1px solid #ddd; padding: 16px; border-radius: 10px; }
+    .field { margin: 12px 0; }
+    label { display:block; font-weight:600; margin-bottom:6px; }
+    input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    .error-input { border-color: #b91c1c; background: #fff5f5; }
+    .error-text { color: #b91c1c; font-size: 12px; margin-top: 6px; }
+    .actions { display:flex; gap:10px; margin-top: 16px; }
+    button { padding: 10px 14px; border: 0; border-radius: 8px; background: #1D499B; color: white; cursor:pointer; }
+    a { display:inline-block; padding: 10px 14px; border-radius: 8px; border: 1px solid #ddd; text-decoration:none; color:#1D499B; }
+    .alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+    .muted { color:#666; font-size:12px; margin-top:6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>{% if mode == 'new' %}New Product{% else %}Edit Product #{{ product.product_id }}{% endif %}</h1>
+
+    {% if errors %}
+      <div class="alert">Please fix the highlighted fields.</div>
+    {% endif %}
+
+    <form method="post" action="{% if mode == 'new' %}/products/new{% else %}/products/{{ product.product_id }}/edit{% endif %}" novalidate>
+      <div class="field">
+        <label for="product_name">Product Name (required)</label>
+        <input id="product_name" name="product_name" value="{{ form_values.product_name }}"
+               class="{{ 'error-input' if errors.get('product_name') else '' }}">
+        {% if errors.get('product_name') %}<div class="error-text">{{ errors.get('product_name') }}</div>{% endif %}
+      </div>
+
+      <div class="field">
+        <label for="sku">SKU</label>
+        <input id="sku" name="sku" value="{{ form_values.sku }}">
+      </div>
+
+      <div class="field">
+        <label for="category">Category</label>
+        <input id="category" name="category" value="{{ form_values.category }}">
+      </div>
+
+      <div class="field">
+        <label for="unit">Unit (e.g., cases, lbs)</label>
+        <input id="unit" name="unit" value="{{ form_values.unit }}">
+      </div>
+
+      <div class="field">
+        <label for="unit_price">Unit Price (numeric)</label>
+        <input id="unit_price" name="unit_price" value="{{ form_values.unit_price }}"
+               class="{{ 'error-input' if errors.get('unit_price') else '' }}" placeholder="e.g., 28.50">
+        {% if errors.get('unit_price') %}<div class="error-text">{{ errors.get('unit_price') }}</div>{% endif %}
+        <div class="muted">Quantity is set per route in “Manage load”.</div>
+      </div>
+
+      <div class="actions">
+        <button type="submit">Save</button>
+        <a href="/products">Cancel</a>
+      </div>
+    </form>
+  </div>
+</body>
+</html>

@@ -5,7 +5,7 @@
   <title>Edit Route</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 24px; }
-    .card { max-width: 700px; border: 1px solid #ddd; padding: 16px; border-radius: 10px; }
+    .card { max-width: 820px; border: 1px solid #ddd; padding: 16px; border-radius: 10px; }
     .field { margin: 12px 0; }
     label { display:block; font-weight:600; margin-bottom:6px; }
     input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
@@ -15,6 +15,9 @@
     button { padding: 10px 14px; border: 0; border-radius: 8px; background: #1D499B; color: white; cursor:pointer; }
     a { display:inline-block; padding: 10px 14px; border-radius: 8px; border: 1px solid #ddd; text-decoration:none; color:#1D499B; }
     .alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    h2 { margin-top: 18px; font-size: 18px; }
+    .muted { color:#666; font-size:12px; margin-top: 4px; }
   </style>
 </head>
 <body>
@@ -26,52 +29,87 @@
     {% endif %}
 
     <form method="post" action="{{ url_for('route_edit_post', route_id=route.route_id) }}" novalidate>
+
       <div class="field">
         <label for="name">Route Name (optional)</label>
         <input id="name" name="name" value="{{ form_values.name }}">
       </div>
 
+      <div class="grid2">
+        <div class="field">
+          <label for="origin_location_id">Start (required)</label>
+          <select
+            id="origin_location_id"
+            name="origin_location_id"
+            class="{{ 'error-input' if errors.get('origin_location_id') else '' }}"
+          >
+            <option value="">-- Select start --</option>
+            {% for loc in locations %}
+              <option value="{{ loc.location_id }}"
+                {% if form_values.origin_location_id == (loc.location_id | string) %}selected{% endif %}
+              >
+                {{ loc.name }}
+              </option>
+            {% endfor %}
+          </select>
+          {% if errors.get('origin_location_id') %}
+            <div class="error-text">{{ errors.get('origin_location_id') }}</div>
+          {% endif %}
+        </div>
+
+        <div class="field">
+          <label for="dest_location_id">Destination (required)</label>
+          <select
+            id="dest_location_id"
+            name="dest_location_id"
+            class="{{ 'error-input' if errors.get('dest_location_id') else '' }}"
+          >
+            <option value="">-- Select destination --</option>
+            {% for loc in locations %}
+              <option value="{{ loc.location_id }}"
+                {% if form_values.dest_location_id == (loc.location_id | string) %}selected{% endif %}
+              >
+                {{ loc.name }}
+              </option>
+            {% endfor %}
+          </select>
+          {% if errors.get('dest_location_id') %}
+            <div class="error-text">{{ errors.get('dest_location_id') }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <h2>Addresses</h2>
+
       <div class="field">
-        <label for="origin_location_id">Start (required)</label>
-        <select
-          id="origin_location_id"
-          name="origin_location_id"
-          class="{{ 'error-input' if errors.get('origin_location_id') else '' }}"
+        <label for="origin_address">Origin Address (required)</label>
+        <input
+          id="origin_address"
+          name="origin_address"
+          value="{{ form_values.origin_address }}"
+          class="{{ 'error-input' if errors.get('origin_address') else '' }}"
+          placeholder="Street, City, State ZIP"
         >
-          <option value="">-- Select start --</option>
-          {% for loc in locations %}
-            <option value="{{ loc.location_id }}"
-              {% if form_values.origin_location_id == (loc.location_id | string) %}selected{% endif %}
-            >
-              {{ loc.name }}
-            </option>
-          {% endfor %}
-        </select>
-        {% if errors.get('origin_location_id') %}
-          <div class="error-text">{{ errors.get('origin_location_id') }}</div>
+        {% if errors.get('origin_address') %}
+          <div class="error-text">{{ errors.get('origin_address') }}</div>
         {% endif %}
       </div>
 
       <div class="field">
-        <label for="dest_location_id">Destination (required)</label>
-        <select
-          id="dest_location_id"
-          name="dest_location_id"
-          class="{{ 'error-input' if errors.get('dest_location_id') else '' }}"
+        <label for="dest_address">Destination Address (required)</label>
+        <input
+          id="dest_address"
+          name="dest_address"
+          value="{{ form_values.dest_address }}"
+          class="{{ 'error-input' if errors.get('dest_address') else '' }}"
+          placeholder="Street, City, State ZIP"
         >
-          <option value="">-- Select destination --</option>
-          {% for loc in locations %}
-            <option value="{{ loc.location_id }}"
-              {% if form_values.dest_location_id == (loc.location_id | string) %}selected{% endif %}
-            >
-              {{ loc.name }}
-            </option>
-          {% endfor %}
-        </select>
-        {% if errors.get('dest_location_id') %}
-          <div class="error-text">{{ errors.get('dest_location_id') }}</div>
+        {% if errors.get('dest_address') %}
+          <div class="error-text">{{ errors.get('dest_address') }}</div>
         {% endif %}
       </div>
+
+      <h2>Sales</h2>
 
       <div class="field">
         <label for="sales_amount">Sales Amount (required, numeric)</label>
@@ -85,6 +123,53 @@
         {% if errors.get('sales_amount') %}
           <div class="error-text">{{ errors.get('sales_amount') }}</div>
         {% endif %}
+      </div>
+
+      <h2>Costs</h2>
+      <div class="muted">These are placeholders. Leave blank if unknown. If filled, must be numeric.</div>
+
+      <div class="grid2">
+        <div class="field">
+          <label for="driver_cost">Driver Cost</label>
+          <input id="driver_cost" name="driver_cost" value="{{ form_values.driver_cost }}"
+                 class="{{ 'error-input' if errors.get('driver_cost') else '' }}" placeholder="e.g., 120">
+          {% if errors.get('driver_cost') %}<div class="error-text">{{ errors.get('driver_cost') }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="fuel_cost">Fuel Cost</label>
+          <input id="fuel_cost" name="fuel_cost" value="{{ form_values.fuel_cost }}"
+                 class="{{ 'error-input' if errors.get('fuel_cost') else '' }}" placeholder="e.g., 80">
+          {% if errors.get('fuel_cost') %}<div class="error-text">{{ errors.get('fuel_cost') }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="load_cost">Load Cost</label>
+          <input id="load_cost" name="load_cost" value="{{ form_values.load_cost }}"
+                 class="{{ 'error-input' if errors.get('load_cost') else '' }}" placeholder="e.g., 25">
+          {% if errors.get('load_cost') %}<div class="error-text">{{ errors.get('load_cost') }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="unload_cost">Unload Cost</label>
+          <input id="unload_cost" name="unload_cost" value="{{ form_values.unload_cost }}"
+                 class="{{ 'error-input' if errors.get('unload_cost') else '' }}" placeholder="e.g., 25">
+          {% if errors.get('unload_cost') %}<div class="error-text">{{ errors.get('unload_cost') }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="depreciation_cost">Depreciation Cost</label>
+          <input id="depreciation_cost" name="depreciation_cost" value="{{ form_values.depreciation_cost }}"
+                 class="{{ 'error-input' if errors.get('depreciation_cost') else '' }}" placeholder="e.g., 15">
+          {% if errors.get('depreciation_cost') %}<div class="error-text">{{ errors.get('depreciation_cost') }}</div>{% endif %}
+        </div>
+
+        <div class="field">
+          <label for="insurance_cost">Insurance Cost</label>
+          <input id="insurance_cost" name="insurance_cost" value="{{ form_values.insurance_cost }}"
+                 class="{{ 'error-input' if errors.get('insurance_cost') else '' }}" placeholder="e.g., 10">
+          {% if errors.get('insurance_cost') %}<div class="error-text">{{ errors.get('insurance_cost') }}</div>{% endif %}
+        </div>
       </div>
 
       <div class="actions">

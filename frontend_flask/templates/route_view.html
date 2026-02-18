@@ -1,0 +1,175 @@
+<!-- templates/route_view.html -->
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Route Details</title>
+
+  <style>
+    :root{
+      --brand:#1D499B;
+      --bg:#f6f8fc;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:#e2e8f0;
+      --shadow: 0 10px 25px rgba(2,6,23,.08);
+      --radius: 14px;
+    }
+
+    body { font-family: Arial, sans-serif; margin:0; background:var(--bg); color:var(--text); }
+    .wrap { max-width: 1100px; margin: 28px auto; padding: 0 18px; }
+
+    .top{
+      display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; gap:12px;
+    }
+
+    h1{ margin:0; font-size: 24px; }
+    .sub{ color:var(--muted); margin-top:6px; font-size: 13px; }
+
+    .btn{
+      border:1px solid var(--border);
+      background: var(--card);
+      color: var(--brand);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor:pointer;
+      font-weight:700;
+      text-decoration:none;
+      display:inline-block;
+    }
+
+    .card{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .k{ font-size: 12px; color:#334155; text-transform: uppercase; font-weight:900; letter-spacing:.05em; }
+    .v{ margin-top:6px; font-weight:800; }
+    .muted{ color:var(--muted); font-size: 13px; margin-top:4px; font-weight:700; }
+
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid var(--border); padding: 10px; text-align:left; }
+    th { background:#f8fafc; font-size:12px; text-transform: uppercase; letter-spacing:.05em; color:#334155; }
+
+    .map-placeholder{
+      width:100%;
+      height:260px;
+      background:#e5e7eb;
+      border-radius:12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#6b7280;
+      font-weight:800;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+
+    <div class="top">
+      <div>
+        <h1>Route #{{ route.route_id }}</h1>
+        <div class="sub">{{ route.origin_name }} → {{ route.dest_name }}</div>
+      </div>
+
+      <div style="display:flex; gap:10px;">
+        <a class="btn" href="/routes">Back</a>
+        <a class="btn" href="/routes/{{ route.route_id }}/edit">Edit</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid2">
+        <div>
+          <div class="k">Origin</div>
+          <div class="v">{{ route.origin_name }}</div>
+          <div class="muted">{{ route.origin_address }}</div>
+        </div>
+
+        <div>
+          <div class="k">Destination</div>
+          <div class="v">{{ route.dest_name }}</div>
+          <div class="muted">{{ route.dest_address }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="grid2">
+        <div>
+          <div class="k">Vehicle</div>
+          {% if vehicle %}
+            <div class="v">{{ vehicle.vehicle_name }}</div>
+            <div class="muted">MPG: {{ vehicle.mpg }}</div>
+            <div class="muted">Fuel $/gal: {{ vehicle.fuel_price }}</div>
+            <div class="muted">Capacity: {{ vehicle.capacity }}</div>
+          {% else %}
+            <div class="muted">Unassigned</div>
+          {% endif %}
+        </div>
+
+        <div>
+          <div class="k">Financials</div>
+          <div class="muted">Base Sales: ${{ "%.2f"|format(base_sales) }}</div>
+          <div class="muted">Products Subtotal: ${{ "%.2f"|format(manifest_subtotal) }}</div>
+          <div class="muted" style="font-weight:900; color:#0f172a;">
+            Total Sales: ${{ "%.2f"|format(route.sales_amount) }}
+          </div>
+          <div class="muted">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="k">Route Map</div>
+      <div class="map-placeholder">Map will render here (Maps API later)</div>
+    </div>
+
+    <div class="card">
+      <div class="k">Manifest</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Line Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if manifest|length == 0 %}
+            <tr>
+              <td colspan="4" class="muted">No products on this route yet.</td>
+            </tr>
+          {% endif %}
+
+          {% for item in manifest %}
+          <tr>
+            <td>{{ item.product_name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>
+              {% if item.unit_price is not none %}
+                ${{ "%.2f"|format(item.unit_price) }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>${{ "%.2f"|format(item.line_total) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</body>
+</html>
