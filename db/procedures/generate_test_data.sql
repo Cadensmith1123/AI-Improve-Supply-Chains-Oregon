@@ -14,52 +14,52 @@ BEGIN
     SET FOREIGN_KEY_CHECKS = 1;
 
     -- 1. PRODUCTS
-    INSERT INTO products_master (product_code, name, storage_type) VALUES 
-    ('VEG-BROC', 'Broccoli Crowns', 'Ref'), ('VEG-POTATO', 'Russet Potatoes', 'Dry'),
-    ('FRT-APPLE', 'Apples', 'Ref'), ('MEAT-BEEF', 'Ground Beef', 'Frz');
+    INSERT INTO products_master (tenant_id, product_code, name, storage_type) VALUES 
+    (1, 'VEG-BROC', 'Broccoli Crowns', 'Ref'), (1, 'VEG-POTATO', 'Russet Potatoes', 'Dry'),
+    (1, 'FRT-APPLE', 'Apples', 'Ref'), (1, 'MEAT-BEEF', 'Ground Beef', 'Frz');
 
     -- 2. LOCATIONS (Now includes Load/Unload Averages)
-    INSERT INTO locations (name, type, address_street, city, state, zip, phone, latitude, longitude, avg_load_minutes, avg_unload_minutes) VALUES 
+    INSERT INTO locations (tenant_id, name, type, address_street, city, state, zip_code, phone, latitude, longitude, avg_load_minutes, avg_unload_minutes) VALUES 
     -- Hub (Fast: 20 min)
-    ('Portland Central Hub', 'Hub', '123 Logistics Way', 'Portland', 'OR', '97209', '503-555-0100', 45.5202, -122.6742, 20, 20),
+    (1, 'Portland Central Hub', 'Hub', '123 Logistics Way', 'Portland', 'OR', '97209', '503-555-0100', 45.5202, -122.6742, 20, 20),
     -- Farms (Slow: 60 min load)
-    ('Green River Farm', 'Farm', '4000 River Rd', 'Sauvie Island', 'OR', '97231', '503-555-1000', 45.6500, -122.8000, 60, 30),
-    ('Red Barn Orchards', 'Farm', '990 Fruit Loop', 'Hood River', 'OR', '97031', '541-555-9000', 45.7054, -121.5215, 60, 30),
-    ('Valley Beef Ranch', 'Farm', '88 Cattle Drive', 'Tillamook', 'OR', '97141', '503-555-5555', 45.4560, -123.8380, 45, 30),
+    (1, 'Green River Farm', 'Farm', '4000 River Rd', 'Sauvie Island', 'OR', '97231', '503-555-1000', 45.6500, -122.8000, 60, 30),
+    (1, 'Red Barn Orchards', 'Farm', '990 Fruit Loop', 'Hood River', 'OR', '97031', '541-555-9000', 45.7054, -121.5215, 60, 30),
+    (1, 'Valley Beef Ranch', 'Farm', '88 Cattle Drive', 'Tillamook', 'OR', '97141', '503-555-5555', 45.4560, -123.8380, 45, 30),
     -- Stores (Medium: 30 min load)
-    ('City Market Downtown', 'Store', '700 SW 5th Ave', 'Portland', 'OR', '97204', '503-555-0199', 45.5189, -122.6790, 30, 45),
-    ('Suburb Grocer', 'Store', '1500 Beaverton Blvd', 'Beaverton', 'OR', '97005', '503-555-2222', 45.4871, -122.8037, 30, 45),
-    ('Co-op Eastside', 'Store', '2000 SE Hawthorne', 'Portland', 'OR', '97214', '503-555-3333', 45.5120, -122.6450, 30, 45);
+    (1, 'City Market Downtown', 'Store', '700 SW 5th Ave', 'Portland', 'OR', '97204', '503-555-0199', 45.5189, -122.6790, 30, 45),
+    (1, 'Suburb Grocer', 'Store', '1500 Beaverton Blvd', 'Beaverton', 'OR', '97005', '503-555-2222', 45.4871, -122.8037, 30, 45),
+    (1, 'Co-op Eastside', 'Store', '2000 SE Hawthorne', 'Portland', 'OR', '97214', '503-555-3333', 45.5120, -122.6450, 30, 45);
 
     -- 3. ENTITIES
-    INSERT INTO entities (name, entity_min_profit) VALUES 
-    ('Green River Co-op', 0), ('Red Barn Orchards LLC', 50), ('Valley Ranchers Inc', 100);
+    INSERT INTO entities (tenant_id, name, entity_min_profit) VALUES 
+    (1, 'Green River Co-op', 0), (1, 'Red Barn Orchards LLC', 50), (1, 'Valley Ranchers Inc', 100);
 
     -- 4. ASSETS
-    INSERT INTO drivers (name, hourly_drive_wage, hourly_load_wage) VALUES 
-    ('Steve', 22.00, 15.00), ('Holly', 25.00, 18.00), ('Mike', 20.00, 15.00);
+    INSERT INTO drivers (tenant_id, name, hourly_drive_wage, hourly_load_wage) VALUES 
+    (1, 'Steve', 22.00, 15.00), (1, 'Holly', 25.00, 18.00), (1, 'Mike', 20.00, 15.00);
     
-    INSERT INTO vehicles (name, mpg, depreciation_per_mile, annual_insurance_cost, annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_capability) VALUES 
-    ('Sprinter Van', 18.0, 0.15, 1200.00, 1000.00, 2500, 300, 'Ref'),
-    ('Box Truck A', 10.0, 0.35, 2400.00, 1500.00, 8000, 800, 'Dry'),
-    ('Reefer Truck Big', 8.5, 0.55, 3000.00, 1800.00, 12000, 1200, 'Frz');
+    INSERT INTO vehicles (tenant_id, name, mpg, depreciation_per_mile, annual_insurance_cost, annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type) VALUES 
+    (1, 'Sprinter Van', 18.0, 0.15, 1200.00, 1000.00, 2500, 300, 'Ref'),
+    (1, 'Box Truck A', 10.0, 0.35, 2400.00, 1500.00, 8000, 800, 'Dry'),
+    (1, 'Reefer Truck Big', 8.5, 0.55, 3000.00, 1800.00, 12000, 1200, 'Frz');
 
     -- 5. SUPPLY
-    INSERT INTO supply (entity_id, location_id, product_code, quantity_available, unit_weight_lbs, unit_volume_cu_ft, items_per_handling_unit, cost_per_item) VALUES 
-    (1, 2, 'VEG-BROC', 5.0, 1200.00, 48.00, 48, 20.00),
-    (1, 2, 'VEG-POTATO', 10.0, 800.00, 16.00, 1, 300.00),
-    (2, 3, 'FRT-APPLE', 20.0, 50.00, 2.00, 100, 0.40),
-    (3, 4, 'MEAT-BEEF', 2.0, 1500.00, 40.00, 50, 80.00);
+    INSERT INTO supply (tenant_id, entity_id, location_id, product_code, quantity_available, unit_weight_lbs, unit_volume_cu_ft, items_per_handling_unit, cost_per_item) VALUES 
+    (1, 1, 2, 'VEG-BROC', 5.0, 1200.00, 48.00, 48, 20.00),
+    (1, 1, 2, 'VEG-POTATO', 10.0, 800.00, 16.00, 1, 300.00),
+    (1, 2, 3, 'FRT-APPLE', 20.0, 50.00, 2.00, 100, 0.40),
+    (1, 3, 4, 'MEAT-BEEF', 2.0, 1500.00, 40.00, 50, 80.00);
 
     -- 6. DEMAND
-    INSERT INTO demand (location_id, product_code, quantity_needed, max_price) VALUES
-    (5, 'VEG-BROC', 20.0, 35.00), (5, 'FRT-APPLE', 500.0, 0.80), 
-    (6, 'VEG-POTATO', 5.0, 450.00), (7, 'MEAT-BEEF', 20.0, 120.00);
+    INSERT INTO demand (tenant_id, location_id, product_code, quantity_needed, max_price) VALUES
+    (1, 5, 'VEG-BROC', 20.0, 35.00), (1, 5, 'FRT-APPLE', 500.0, 0.80), 
+    (1, 6, 'VEG-POTATO', 5.0, 450.00), (1, 7, 'MEAT-BEEF', 20.0, 120.00);
 
     -- 7. ROUTES
-    INSERT INTO routes (name, origin_location_id, dest_location_id) VALUES 
-    ('Sauvie Farm -> Hub', 2, 1), ('Hood River -> Hub', 3, 1), ('Tillamook -> Hub', 4, 1),
-    ('Hub -> City Market', 1, 5), ('Hub -> Suburb Grocer', 1, 6), ('Hub -> Eastside Co-op', 1, 7);
+    INSERT INTO routes (tenant_id, name, origin_location_id, dest_location_id) VALUES 
+    (1, 'Sauvie Farm -> Hub', 2, 1), (1, 'Hood River -> Hub', 3, 1), (1, 'Tillamook -> Hub', 4, 1),
+    (1, 'Hub -> City Market', 1, 5), (1, 'Hub -> Suburb Grocer', 1, 6), (1, 'Hub -> Eastside Co-op', 1, 7);
     
     SELECT 'SUCCESS: Synthetic Data Generated' AS status;
 END$$

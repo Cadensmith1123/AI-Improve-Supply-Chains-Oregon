@@ -163,12 +163,13 @@ def test_01_locations(connection, features_dict, schema_types):
     
     # 1. Create
     new_id = create.add_location(
+            tenant_id=1,
             name=generate_random_value(cols['name']),
             type=generate_random_value(cols['type']),
             address_street=generate_random_value(cols['address_street']),
             city=generate_random_value(cols['city']),
             state=generate_random_value(cols['state']),
-            zip_code=generate_random_value(cols['zip']),
+            zip_code=generate_random_value(cols['zip_code']),
             phone=generate_random_value(cols['phone']),
             latitude=generate_random_value(cols['latitude']),
             longitude=generate_random_value(cols['longitude']),
@@ -180,13 +181,13 @@ def test_01_locations(connection, features_dict, schema_types):
     connection.commit()
 
     # 2. Verify Single Row
-    rows = read.view_locations(connection, ids=new_id)
+    rows = read.view_locations(1, connection, ids=new_id)
     assert len(rows) == 1
     assert rows[0]["location_id"] == new_id
 
     # 3. Verify All Cols & Get Baseline
     features = features_dict["locations"]
-    all_rows = read.view_locations(connection, columns=features)
+    all_rows = read.view_locations(1, connection, columns=features)
     returned_features = all_rows[0].keys()
     
     for feature in features:
@@ -203,7 +204,7 @@ def test_01_locations(connection, features_dict, schema_types):
     num_rand_features = random.randrange(1, len(features))
     rand_features = random.sample(features, k=num_rand_features)
     
-    rows = read.view_locations(connection, columns=rand_features, limit=num_rows)
+    rows = read.view_locations(1, connection, columns=rand_features, limit=num_rows)
     returned_features = rows[0].keys()
     
     for feature in rand_features:
@@ -212,13 +213,13 @@ def test_01_locations(connection, features_dict, schema_types):
     assert len(rows) == num_rows
     
     # 5. Delete Test
-    delete.delete_location(new_id, conn=connection)
+    delete.delete_location(1, new_id, conn=connection)
     connection.commit()
     
-    rows_after = read.view_locations(connection)
+    rows_after = read.view_locations(1, connection)
     assert len(rows_after) == len(all_rows) - 1
     
-    deleted_row = read.view_locations(connection, ids=new_id)
+    deleted_row = read.view_locations(1, connection, ids=new_id)
     assert len(deleted_row) == 0
 
 
@@ -227,6 +228,7 @@ def test_02_products_master(connection, features_dict, schema_types):
     
     # 1. Create
     new_id = create.add_product_master(
+        tenant_id=1,
         product_code=generate_random_value(cols['product_code']),
         name=generate_random_value(cols['name']),
         storage_type=generate_random_value(cols['storage_type']),
@@ -235,13 +237,13 @@ def test_02_products_master(connection, features_dict, schema_types):
     connection.commit()
 
     # 2. Verify Single Row
-    rows = read.view_products_master(connection, ids=new_id)
+    rows = read.view_products_master(1, connection, ids=new_id)
     assert len(rows) == 1
     assert rows[0]["product_code"] == new_id
 
     # 3. Verify All Cols & Get Baseline
     features = features_dict["products_master"]
-    all_rows = read.view_products_master(connection, columns=features)
+    all_rows = read.view_products_master(1, connection, columns=features)
     
     for feature in features:
         assert feature in all_rows[0].keys()
@@ -257,7 +259,7 @@ def test_02_products_master(connection, features_dict, schema_types):
     num_rand_features = random.randrange(1, len(features))
     rand_features = random.sample(features, k=num_rand_features)
     
-    rows = read.view_products_master(connection, columns=rand_features, limit=num_rows)
+    rows = read.view_products_master(1, connection, columns=rand_features, limit=num_rows)
     
     for feature in rand_features:
         assert feature in rows[0].keys()
@@ -265,13 +267,13 @@ def test_02_products_master(connection, features_dict, schema_types):
     assert len(rows) == num_rows
 
     # 5. Delete Test
-    delete.delete_product_master(new_id, conn=connection)
+    delete.delete_product_master(1, new_id, conn=connection)
     connection.commit()
     
-    rows_after = read.view_products_master(connection)
+    rows_after = read.view_products_master(1, connection)
     assert len(rows_after) == len(all_rows) - 1
     
-    deleted_row = read.view_products_master(connection, ids=new_id)
+    deleted_row = read.view_products_master(1, connection, ids=new_id)
     assert len(deleted_row) == 0
 
 
@@ -280,6 +282,7 @@ def test_03_drivers(connection, features_dict, schema_types):
     
     # 1. Create
     new_id = create.add_driver(
+        tenant_id=1,
         name=generate_random_value(cols['name']),
         hourly_drive_wage=generate_random_value(cols['hourly_drive_wage']),
         hourly_load_wage=generate_random_value(cols['hourly_load_wage']),
@@ -288,13 +291,13 @@ def test_03_drivers(connection, features_dict, schema_types):
     connection.commit()
 
     # 2. Verify Single Row
-    rows = read.view_drivers(connection, ids=new_id)
+    rows = read.view_drivers(1, connection, ids=new_id)
     assert len(rows) == 1
     assert rows[0]["driver_id"] == new_id
 
     # 3. Verify All Cols & Get Baseline
     features = features_dict["drivers"]
-    all_rows = read.view_drivers(connection, columns=features)
+    all_rows = read.view_drivers(1, connection, columns=features)
     
     for feature in features:
         assert feature in all_rows[0].keys()
@@ -309,20 +312,20 @@ def test_03_drivers(connection, features_dict, schema_types):
     num_rand_features = random.randrange(1, len(features))
     rand_features = random.sample(features, k=num_rand_features)
     
-    rows = read.view_drivers(connection, columns=rand_features, limit=num_rows)
+    rows = read.view_drivers(1, connection, columns=rand_features, limit=num_rows)
     
     for feature in rand_features:
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
     # 5. Delete Test
-    delete.delete_driver(new_id, conn=connection)
+    delete.delete_driver(1, new_id, conn=connection)
     connection.commit()
     
-    rows_after = read.view_drivers(connection)
+    rows_after = read.view_drivers(1, connection)
     assert len(rows_after) == len(all_rows) - 1
     
-    deleted_row = read.view_drivers(connection, ids=new_id)
+    deleted_row = read.view_drivers(1, connection, ids=new_id)
     assert len(deleted_row) == 0
 
 
@@ -331,25 +334,27 @@ def test_04_vehicles(connection, features_dict, schema_types):
 
     # 1. Create
     new_id = create.add_vehicle(
+        tenant_id=1,
         name=generate_random_value(cols['name']),
         mpg=generate_random_value(cols['mpg']),
         depreciation_per_mile=generate_random_value(cols['depreciation_per_mile']),
         annual_insurance_cost=generate_random_value(cols['annual_insurance_cost']),
+        annual_maintenance_cost=generate_random_value(cols['annual_maintenance_cost']),
         max_weight_lbs=generate_random_value(cols['max_weight_lbs']),
         max_volume_cubic_ft=generate_random_value(cols['max_volume_cubic_ft']),
-        storage_type=generate_random_value(cols['storage_capability']), 
+            storage_type=generate_random_value(cols['storage_type']), 
         conn=connection
     )
     connection.commit()
 
     # 2. Verify Single Row
-    rows = read.view_vehicles(connection, ids=new_id)
+    rows = read.view_vehicles(1, connection, ids=new_id)
     assert len(rows) == 1
     assert rows[0]["vehicle_id"] == new_id
 
     # 3. Verify All Cols & Get Baseline
     features = features_dict["vehicles"]
-    all_rows = read.view_vehicles(connection, columns=features)
+    all_rows = read.view_vehicles(1, connection, columns=features)
 
     for feature in features:
         assert feature in all_rows[0].keys()
@@ -364,20 +369,20 @@ def test_04_vehicles(connection, features_dict, schema_types):
     num_rand_features = random.randrange(1, len(features))
     rand_features = random.sample(features, k=num_rand_features)
     
-    rows = read.view_vehicles(connection, columns=rand_features, limit=num_rows)
+    rows = read.view_vehicles(1, connection, columns=rand_features, limit=num_rows)
     
     for feature in rand_features:
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
     # 5. Delete Test
-    delete.delete_vehicle(new_id, conn=connection)
+    delete.delete_vehicle(1, new_id, conn=connection)
     connection.commit()
     
-    rows_after = read.view_vehicles(connection)
+    rows_after = read.view_vehicles(1, connection)
     assert len(rows_after) == len(all_rows) - 1
     
-    deleted_row = read.view_vehicles(connection, ids=new_id)
+    deleted_row = read.view_vehicles(1, connection, ids=new_id)
     assert len(deleted_row) == 0
 
 
@@ -386,6 +391,7 @@ def test_05_entities(connection, features_dict, schema_types):
     
     # 1. Create
     new_id = create.add_entity(
+        tenant_id=1,
         name=generate_random_value(cols['name']),
         entity_min_profit=generate_random_value(cols['entity_min_profit']),
         conn=connection
@@ -393,13 +399,13 @@ def test_05_entities(connection, features_dict, schema_types):
     connection.commit()
 
     # 2. Verify Single Row
-    rows = read.view_entities(connection, ids=new_id)
+    rows = read.view_entities(1, connection, ids=new_id)
     assert len(rows) == 1
     assert rows[0]["entity_id"] == new_id
 
     # 3. Verify All Cols & Get Baseline
     features = features_dict["entities"]
-    all_rows = read.view_entities(connection, columns=features)
+    all_rows = read.view_entities(1, connection, columns=features)
     
     for feature in features:
         assert feature in all_rows[0].keys()
@@ -414,20 +420,20 @@ def test_05_entities(connection, features_dict, schema_types):
     num_rand_features = random.randrange(1, len(features))
     rand_features = random.sample(features, k=num_rand_features)
     
-    rows = read.view_entities(connection, columns=rand_features, limit=num_rows)
+    rows = read.view_entities(1, connection, columns=rand_features, limit=num_rows)
     
     for feature in rand_features:
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
     # 5. Delete Test
-    delete.delete_entity(new_id, conn=connection)
+    delete.delete_entity(1, new_id, conn=connection)
     connection.commit()
     
-    rows_after = read.view_entities(connection)
+    rows_after = read.view_entities(1, connection)
     assert len(rows_after) == len(all_rows) - 1
     
-    deleted_row = read.view_entities(connection, ids=new_id)
+    deleted_row = read.view_entities(1, connection, ids=new_id)
     assert len(deleted_row) == 0
 
 
@@ -435,17 +441,18 @@ def test_06_supply(connection, features_dict, schema_types):
     cols = schema_types['supply']
     
     # 1. Fetch Existing Dependencies (Assumes DB is populated)
-    entities = read.view_entities(connection)
+    entities = read.view_entities(1, connection)
     ent_id = random.choice(entities)['entity_id']
     
-    locations = read.view_locations(connection)
+    locations = read.view_locations(1, connection)
     loc_id = random.choice(locations)['location_id']
     
-    products = read.view_products_master(connection)
+    products = read.view_products_master(1, connection)
     prod_id = random.choice(products)['product_code']
 
     # 2. Create Target
     new_id = create.add_supply(
+        tenant_id=1,
         entity_id=ent_id,
         location_id=loc_id,
         product_code=prod_id,
@@ -459,13 +466,13 @@ def test_06_supply(connection, features_dict, schema_types):
     connection.commit()
 
     # 3. Verify Single Row
-    rows = read.view_supply(connection, ids=new_id)
+    rows = read.view_supply(1, connection, ids=new_id)
     assert len(rows) == 1
     assert rows[0]["supply_id"] == new_id
 
     # 4. Verify All Cols & Get Baseline
     features = features_dict["supply"]
-    all_rows = read.view_supply(connection, columns=features)
+    all_rows = read.view_supply(1, connection, columns=features)
     
     for feature in features:
         assert feature in all_rows[0].keys()
@@ -480,20 +487,20 @@ def test_06_supply(connection, features_dict, schema_types):
     num_rand_features = random.randrange(1, len(features))
     rand_features = random.sample(features, k=num_rand_features)
     
-    rows = read.view_supply(connection, columns=rand_features, limit=num_rows)
+    rows = read.view_supply(1, connection, columns=rand_features, limit=num_rows)
     
     for feature in rand_features:
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
     # 6. Delete Test
-    delete.delete_supply(new_id, conn=connection)
+    delete.delete_supply(1, new_id, conn=connection)
     connection.commit()
     
-    rows_after = read.view_supply(connection)
+    rows_after = read.view_supply(1, connection)
     assert len(rows_after) == len(all_rows) - 1
     
-    deleted_row = read.view_supply(connection, ids=new_id)
+    deleted_row = read.view_supply(1, connection, ids=new_id)
     assert len(deleted_row) == 0
 
 
@@ -501,14 +508,15 @@ def test_07_demand(connection, features_dict, schema_types):
     cols = schema_types['demand']
     
     # 1. Fetch Existing Dependencies
-    locations = read.view_locations(connection)
+    locations = read.view_locations(1, connection)
     loc_id = random.choice(locations)['location_id']
 
-    products = read.view_products_master(connection)
+    products = read.view_products_master(1, connection)
     prod_id = random.choice(products)['product_code']
 
     # 2. Create Target
     new_id = create.add_demand(
+        tenant_id=1,
         location_id=loc_id,
         product_code=prod_id,
         quantity_needed=generate_random_value(cols['quantity_needed']),
@@ -518,13 +526,13 @@ def test_07_demand(connection, features_dict, schema_types):
     connection.commit()
 
     # 3. Verify Single Row
-    rows = read.view_demand(connection, ids=new_id)
+    rows = read.view_demand(1, connection, ids=new_id)
     assert len(rows) == 1
     assert rows[0]["demand_id"] == new_id
 
     # 4. Verify All Cols & Get Baseline
     features = features_dict["demand"]
-    all_rows = read.view_demand(connection, columns=features)
+    all_rows = read.view_demand(1, connection, columns=features)
     
     for feature in features:
         assert feature in all_rows[0].keys()
@@ -539,20 +547,20 @@ def test_07_demand(connection, features_dict, schema_types):
     num_rand_features = random.randrange(1, len(features))
     rand_features = random.sample(features, k=num_rand_features)
     
-    rows = read.view_demand(connection, columns=rand_features, limit=num_rows)
+    rows = read.view_demand(1, connection, columns=rand_features, limit=num_rows)
     
     for feature in rand_features:
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
     # 6. Delete Test
-    delete.delete_demand(new_id, conn=connection)
+    delete.delete_demand(1, new_id, conn=connection)
     connection.commit()
     
-    rows_after = read.view_demand(connection)
+    rows_after = read.view_demand(1, connection)
     assert len(rows_after) == len(all_rows) - 1
     
-    deleted_row = read.view_demand(connection, ids=new_id)
+    deleted_row = read.view_demand(1, connection, ids=new_id)
     assert len(deleted_row) == 0
 
 
@@ -560,13 +568,14 @@ def test_08_routes(connection, features_dict, schema_types):
     cols = schema_types['routes']
     
     # 1. Fetch locations for FKs
-    locations = read.view_locations(connection)
+    locations = read.view_locations(1, connection)
     locs = random.sample(locations, 2)
     loc_a = locs[0]['location_id']
     loc_b = locs[1]['location_id']
 
     # 2. Create Target
     new_id = create.add_route(
+        tenant_id=1,
         name=generate_random_value(cols['name']),
         origin_location_id=loc_a,
         dest_location_id=loc_b,
@@ -575,13 +584,13 @@ def test_08_routes(connection, features_dict, schema_types):
     connection.commit()
 
     # 3. Verify Single Row
-    rows = read.view_routes(connection, ids=new_id)
+    rows = read.view_routes(1, connection, ids=new_id)
     assert len(rows) == 1
     assert rows[0]["route_id"] == new_id
 
     # 4. Verify All Cols & Get Baseline
     features = features_dict["routes"]
-    all_rows = read.view_routes(connection, columns=features)
+    all_rows = read.view_routes(1, connection, columns=features)
     
     for feature in features:
         assert feature in all_rows[0].keys()
@@ -596,18 +605,18 @@ def test_08_routes(connection, features_dict, schema_types):
     num_rand_features = random.randrange(1, len(features))
     rand_features = random.sample(features, k=num_rand_features)
     
-    rows = read.view_routes(connection, columns=rand_features, limit=num_rows)
+    rows = read.view_routes(1, connection, columns=rand_features, limit=num_rows)
     
     for feature in rand_features:
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
     # 6. Delete Test
-    delete.delete_route(new_id, conn=connection)
+    delete.delete_route(1, new_id, conn=connection)
     connection.commit()
     
-    rows_after = read.view_routes(connection)
+    rows_after = read.view_routes(1, connection)
     assert len(rows_after) == len(all_rows) - 1
     
-    deleted_row = read.view_routes(connection, ids=new_id)
+    deleted_row = read.view_routes(1, connection, ids=new_id)
     assert len(deleted_row) == 0

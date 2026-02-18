@@ -2,6 +2,7 @@ DELIMITER $$
 
 DROP PROCEDURE IF EXISTS update_location $$
 CREATE PROCEDURE update_location(
+    IN p_tenant_id INT,
     IN p_location_id INT,
     IN p_name VARCHAR(100),
     IN p_type ENUM('Hub','Store','Farm'),
@@ -23,17 +24,18 @@ BEGIN
         address_street = p_address_street,
         city = p_city,
         state = p_state,
-        zip = p_zip,
+        zip_code = p_zip,
         phone = p_phone,
         latitude = p_latitude,
         longitude = p_longitude,
         avg_load_minutes = p_avg_load_minutes,
         avg_unload_minutes = p_avg_unload_minutes
-    WHERE location_id = p_location_id;
+    WHERE location_id = p_location_id AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_product_master $$
 CREATE PROCEDURE update_product_master(
+    IN p_tenant_id INT,
     IN p_product_code VARCHAR(50),
     IN p_name VARCHAR(100),
     IN p_storage_type ENUM('Dry','Ref','Frz')
@@ -43,11 +45,12 @@ BEGIN
     SET
         name = p_name,
         storage_type = p_storage_type
-    WHERE product_code = p_product_code;
+    WHERE product_code = p_product_code AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_driver $$
 CREATE PROCEDURE update_driver(
+    IN p_tenant_id INT,
     IN p_driver_id INT,
     IN p_name VARCHAR(100),
     IN p_hourly_drive_wage DECIMAL(5,2),
@@ -59,16 +62,18 @@ BEGIN
         name = p_name,
         hourly_drive_wage = p_hourly_drive_wage,
         hourly_load_wage = p_hourly_load_wage
-    WHERE driver_id = p_driver_id;
+    WHERE driver_id = p_driver_id AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_vehicle $$
 CREATE PROCEDURE update_vehicle(
+    IN p_tenant_id INT,
     IN p_vehicle_id INT,
     IN p_name VARCHAR(100),
     IN p_mpg DECIMAL(4,1),
     IN p_depreciation_per_mile DECIMAL(10,2),
     IN p_annual_insurance_cost DECIMAL(10,2),
+    IN p_annual_maintenance_cost DECIMAL(10,2),
     IN p_max_weight_lbs INT,
     IN p_max_volume_cubic_ft INT,
     IN p_storage_capability ENUM('Dry','Ref','Frz','Multi')
@@ -80,14 +85,16 @@ BEGIN
         mpg = p_mpg,
         depreciation_per_mile = p_depreciation_per_mile,
         annual_insurance_cost = p_annual_insurance_cost,
+        annual_maintenance_cost = p_annual_maintenance_cost,
         max_weight_lbs = p_max_weight_lbs,
         max_volume_cubic_ft = p_max_volume_cubic_ft,
-        storage_capability = p_storage_capability
-    WHERE vehicle_id = p_vehicle_id;
+        storage_type = p_storage_capability
+    WHERE vehicle_id = p_vehicle_id AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_entity $$
 CREATE PROCEDURE update_entity(
+    IN p_tenant_id INT,
     IN p_entity_id INT,
     IN p_name VARCHAR(100),
     IN p_entity_min_profit INT
@@ -97,11 +104,12 @@ BEGIN
     SET
         name = p_name,
         entity_min_profit = p_entity_min_profit
-    WHERE entity_id = p_entity_id;
+    WHERE entity_id = p_entity_id AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_supply $$
 CREATE PROCEDURE update_supply(
+    IN p_tenant_id INT,
     IN p_supply_id INT,
     IN p_entity_id INT,
     IN p_location_id INT,
@@ -123,11 +131,12 @@ BEGIN
         unit_volume_cu_ft = p_unit_volume_cu_ft,
         items_per_handling_unit = p_items_per_handling_unit,
         cost_per_item = p_cost_per_item
-    WHERE supply_id = p_supply_id;
+    WHERE supply_id = p_supply_id AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_demand $$
 CREATE PROCEDURE update_demand(
+    IN p_tenant_id INT,
     IN p_demand_id INT,
     IN p_location_id INT,
     IN p_product_code VARCHAR(50),
@@ -141,11 +150,12 @@ BEGIN
         product_code = p_product_code,
         quantity_needed = p_quantity_needed,
         max_price = p_max_price
-    WHERE demand_id = p_demand_id;
+    WHERE demand_id = p_demand_id AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_route $$
 CREATE PROCEDURE update_route(
+    IN p_tenant_id INT,
     IN p_route_id INT,
     IN p_name VARCHAR(100),
     IN p_origin_location_id INT,
@@ -157,11 +167,12 @@ BEGIN
         name = p_name,
         origin_location_id = p_origin_location_id,
         dest_location_id = p_dest_location_id
-    WHERE route_id = p_route_id;
+    WHERE route_id = p_route_id AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_scenario $$
 CREATE PROCEDURE update_scenario(
+    IN p_tenant_id INT,
     IN p_scenario_id INT,
     IN p_route_id INT,
     IN p_vehicle_id INT,
@@ -197,11 +208,12 @@ BEGIN
         actual_load_minutes = p_actual_load_minutes,
         actual_unload_minutes = p_actual_unload_minutes,
         snapshot_total_revenue = p_snapshot_total_revenue
-    WHERE scenario_id = p_scenario_id;
+    WHERE scenario_id = p_scenario_id AND tenant_id = p_tenant_id;
 END $$
 
 DROP PROCEDURE IF EXISTS update_manifest_item $$
 CREATE PROCEDURE update_manifest_item(
+    IN p_tenant_id INT,
     IN p_manifest_item_id INT,
     IN p_scenario_id INT,
     IN p_supply_id INT,
@@ -223,7 +235,7 @@ BEGIN
         snapshot_items_per_unit = p_snapshot_items_per_unit,
         snapshot_unit_weight = p_snapshot_unit_weight,
         snapshot_price_per_item = p_snapshot_price_per_item
-    WHERE manifest_item_id = p_manifest_item_id;
+    WHERE manifest_item_id = p_manifest_item_id AND tenant_id = p_tenant_id;
 END $$
 
 DELIMITER ;

@@ -19,6 +19,37 @@ def get_db():
     try:
         return mysql.connector.connect(**db_config)
     except Exception as e:
-        print(f"DB Error: {e}")
+        # Security: Don't print full exception as it may contain credentials
+        print(f"DB Connection Error: {type(e).__name__}")
         return None
 
+
+def execute_creation_proc(proc_name, args, conn=None):
+    """
+    Executes a stored procedure that inserts a record and returns its new ID.
+    Handles connection lifecycle (opens/closes if conn is None).
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db()
+        should_close = True
+    
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
+
+    new_id = None
+    try:
+        cur = conn.cursor()
+        cur.callproc(proc_name, args)
+
+        for r in cur.stored_results():
+            row = r.fetchone()
+            if row:
+                new_id = row[0]
+        conn.commit()
+        cur.close()
+    finally:
+        if should_close and conn:
+            conn.close()
+
+    return new_id
