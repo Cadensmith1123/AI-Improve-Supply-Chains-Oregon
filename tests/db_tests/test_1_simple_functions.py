@@ -5,6 +5,7 @@ import dotenv
 import re
 import db.functions.simple_functions.read as read
 import db.functions.simple_functions.create as create
+import db.functions.simple_functions.update as update
 import db.functions.simple_functions.delete as delete
 import random
 import string
@@ -212,6 +213,29 @@ def test_01_locations(connection, features_dict, schema_types):
     assert len(rand_features) == len(returned_features)
     assert len(rows) == num_rows
     
+    # 2.5 Update Test
+    updated_name = generate_random_value(cols['name'])
+    update.update_location(
+        tenant_id=1,
+        location_id=new_id,
+        name=updated_name,
+        type=generate_random_value(cols['type']),
+        address_street=generate_random_value(cols['address_street']),
+        city=generate_random_value(cols['city']),
+        state=generate_random_value(cols['state']),
+        zip_code=generate_random_value(cols['zip_code']),
+        phone=generate_random_value(cols['phone']),
+        latitude=generate_random_value(cols['latitude']),
+        longitude=generate_random_value(cols['longitude']),
+        avg_load_minutes=generate_random_value(cols['avg_load_minutes']),
+        avg_unload_minutes=generate_random_value(cols['avg_unload_minutes']),
+        conn=connection
+    )
+    connection.commit()
+    
+    updated_row = read.view_locations(1, connection, ids=new_id)[0]
+    assert updated_row['name'] == updated_name
+
     # 5. Delete Test
     delete.delete_location(1, new_id, conn=connection)
     connection.commit()
@@ -266,6 +290,20 @@ def test_02_products_master(connection, features_dict, schema_types):
     assert len(rand_features) == len(rows[0].keys()) # returned features are only requested ones
     assert len(rows) == num_rows
 
+    # 2.5 Update Test
+    updated_name = generate_random_value(cols['name'])
+    update.update_product_master(
+        tenant_id=1,
+        product_code=new_id,
+        name=updated_name,
+        storage_type=generate_random_value(cols['storage_type']),
+        conn=connection
+    )
+    connection.commit()
+
+    updated_row = read.view_products_master(1, connection, ids=new_id)[0]
+    assert updated_row['name'] == updated_name
+
     # 5. Delete Test
     delete.delete_product_master(1, new_id, conn=connection)
     connection.commit()
@@ -318,6 +356,21 @@ def test_03_drivers(connection, features_dict, schema_types):
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
+    # 2.5 Update Test
+    updated_name = generate_random_value(cols['name'])
+    update.update_driver(
+        tenant_id=1,
+        driver_id=new_id,
+        name=updated_name,
+        hourly_drive_wage=generate_random_value(cols['hourly_drive_wage']),
+        hourly_load_wage=generate_random_value(cols['hourly_load_wage']),
+        conn=connection
+    )
+    connection.commit()
+
+    updated_row = read.view_drivers(1, connection, ids=new_id)[0]
+    assert updated_row['name'] == updated_name
+
     # 5. Delete Test
     delete.delete_driver(1, new_id, conn=connection)
     connection.commit()
@@ -375,6 +428,26 @@ def test_04_vehicles(connection, features_dict, schema_types):
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
+    # 2.5 Update Test
+    updated_name = generate_random_value(cols['name'])
+    update.update_vehicle(
+        tenant_id=1,
+        vehicle_id=new_id,
+        name=updated_name,
+        mpg=generate_random_value(cols['mpg']),
+        depreciation_per_mile=generate_random_value(cols['depreciation_per_mile']),
+        annual_insurance_cost=generate_random_value(cols['annual_insurance_cost']),
+        annual_maintenance_cost=generate_random_value(cols['annual_maintenance_cost']),
+        max_weight_lbs=generate_random_value(cols['max_weight_lbs']),
+        max_volume_cubic_ft=generate_random_value(cols['max_volume_cubic_ft']),
+        storage_type=generate_random_value(cols['storage_type']),
+        conn=connection
+    )
+    connection.commit()
+
+    updated_row = read.view_vehicles(1, connection, ids=new_id)[0]
+    assert updated_row['name'] == updated_name
+
     # 5. Delete Test
     delete.delete_vehicle(1, new_id, conn=connection)
     connection.commit()
@@ -426,6 +499,20 @@ def test_05_entities(connection, features_dict, schema_types):
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
+    # 2.5 Update Test
+    updated_name = generate_random_value(cols['name'])
+    update.update_entity(
+        tenant_id=1,
+        entity_id=new_id,
+        name=updated_name,
+        entity_min_profit=generate_random_value(cols['entity_min_profit']),
+        conn=connection
+    )
+    connection.commit()
+
+    updated_row = read.view_entities(1, connection, ids=new_id)[0]
+    assert updated_row['name'] == updated_name
+
     # 5. Delete Test
     delete.delete_entity(1, new_id, conn=connection)
     connection.commit()
@@ -493,6 +580,26 @@ def test_06_supply(connection, features_dict, schema_types):
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
+    # 2.5 Update Test
+    updated_qty = generate_random_value(cols['quantity_available'])
+    update.update_supply(
+        tenant_id=1,
+        supply_id=new_id,
+        entity_id=ent_id,
+        location_id=loc_id,
+        product_code=prod_id,
+        quantity_available=updated_qty,
+        unit_weight_lbs=generate_random_value(cols['unit_weight_lbs']),
+        unit_volume_cu_ft=generate_random_value(cols['unit_volume_cu_ft']),
+        items_per_handling_unit=generate_random_value(cols['items_per_handling_unit']),
+        cost_per_item=generate_random_value(cols['cost_per_item']),
+        conn=connection
+    )
+    connection.commit()
+
+    updated_row = read.view_supply(1, connection, ids=new_id)[0]
+    assert float(updated_row['quantity_available']) == float(updated_qty)
+
     # 6. Delete Test
     delete.delete_supply(1, new_id, conn=connection)
     connection.commit()
@@ -553,6 +660,22 @@ def test_07_demand(connection, features_dict, schema_types):
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
+    # 2.5 Update Test
+    updated_qty = generate_random_value(cols['quantity_needed'])
+    update.update_demand(
+        tenant_id=1,
+        demand_id=new_id,
+        location_id=loc_id,
+        product_code=prod_id,
+        quantity_needed=updated_qty,
+        max_price=generate_random_value(cols['max_price']),
+        conn=connection
+    )
+    connection.commit()
+
+    updated_row = read.view_demand(1, connection, ids=new_id)[0]
+    assert float(updated_row['quantity_needed']) == float(updated_qty)
+
     # 6. Delete Test
     delete.delete_demand(1, new_id, conn=connection)
     connection.commit()
@@ -611,6 +734,21 @@ def test_08_routes(connection, features_dict, schema_types):
         assert feature in rows[0].keys()
     assert len(rows) == num_rows
     
+    # 2.5 Update Test
+    updated_name = generate_random_value(cols['name'])
+    update.update_route(
+        tenant_id=1,
+        route_id=new_id,
+        name=updated_name,
+        origin_location_id=loc_a,
+        dest_location_id=loc_b,
+        conn=connection
+    )
+    connection.commit()
+
+    updated_row = read.view_routes(1, connection, ids=new_id)[0]
+    assert updated_row['name'] == updated_name
+
     # 6. Delete Test
     delete.delete_route(1, new_id, conn=connection)
     connection.commit()
