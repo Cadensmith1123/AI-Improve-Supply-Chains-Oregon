@@ -2,7 +2,17 @@
 from flask import Flask, render_template, request, redirect, url_for, abort
 import db
 
+# app.py
+from flask import Flask, render_template, request, redirect, url_for, abort
+import db
+
+# import blueprint
+from map_route import map_bp
+
 app = Flask(__name__)
+
+# register the blueprint
+app.register_blueprint(map_bp)
 
 
 def _parse_optional_float(raw: str, field_key: str, errors: dict):
