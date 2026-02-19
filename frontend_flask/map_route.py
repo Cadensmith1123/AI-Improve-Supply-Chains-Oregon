@@ -1,12 +1,16 @@
 # map_route.py
 import os
 from flask import Blueprint, render_template, abort, jsonify
-import db
+import access_db as db
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 map_bp = Blueprint("map", __name__, template_folder="templates")
 
 def _get_mapbox_token_or_abort():
-    token = os.environ.get("MAPBOX_TOKEN")
+    token = os.getenv("MAPBOX_TOKEN")
     if not token:
         abort(500, description="MAPBOX_TOKEN is not set in the environment.")
     return token

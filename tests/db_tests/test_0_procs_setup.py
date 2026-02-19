@@ -56,9 +56,8 @@ def execute_sql_script(connection, file_path):
             sql_script = file.read()
 
             # Sanitization
-            sql_script = re.sub(r"(DROP SCHEMA IF EXISTS|CREATE SCHEMA|USE|CALL)\s+local_food_db;", 
-                                r"-- \1 local_food_db;", 
-                                sql_script, flags=re.IGNORECASE)
+            # Remove database switching commands to ensure we stay in test_db. Handles backticks.
+            sql_script = re.sub(r"(DROP SCHEMA IF EXISTS|DROP DATABASE IF EXISTS|CREATE SCHEMA|CREATE DATABASE|USE)\s+([`][^`]+[`]|[\w]+)\s*;", "", sql_script, flags=re.IGNORECASE)
 
             # Clean delimiters
             sql_script = re.sub(r"DELIMITER\s+\S+", "", sql_script, flags=re.IGNORECASE)
