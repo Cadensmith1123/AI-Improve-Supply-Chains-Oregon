@@ -36,19 +36,16 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'scenario_id is required';
     END IF;
 
-    -- Load current header ids (and ensure scenario exists)
+    -- Validate Scenario Exists
+    IF (SELECT COUNT(*) FROM scenarios WHERE scenario_id = p_scenario_id AND tenant_id = p_tenant_id) = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'scenario_id not found';
+    END IF;
+
+    -- Load current header ids
     SELECT route_id, vehicle_id, driver_id
     INTO v_route_id, v_vehicle_id, v_driver_id
     FROM scenarios
     WHERE scenario_id = p_scenario_id AND tenant_id = p_tenant_id;
-
-    IF v_route_id IS NULL AND v_vehicle_id IS NULL AND v_driver_id IS NULL THEN
-        -- This "exists" check is imperfect if all three are NULL in a valid row,
-        -- so do a safer check:
-        IF (SELECT COUNT(*) FROM scenarios WHERE scenario_id = p_scenario_id AND tenant_id = p_tenant_id) = 0 THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'scenario_id not found';
-        END IF;
-    END IF;
 
     -- Decide new ids (NULL means "keep current")
     SET v_new_route_id   = COALESCE(p_route_id,   v_route_id);

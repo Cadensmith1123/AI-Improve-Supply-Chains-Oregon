@@ -2,7 +2,7 @@ USE local_food_db;
 
 DELIMITER $$
 
-DROP PROCEDURE IF EXISTS get_planning_assets$$
+DROP PROCEDURE IF EXISTS get_planning_assets $$
 
 CREATE PROCEDURE get_planning_assets(IN p_tenant_id INT)
 BEGIN
@@ -60,8 +60,8 @@ BEGIN
     SELECT
         location_id, name,
         latitude, longitude,
-        avg_load_minutes,   -- NEW: Estimate loading time
-        avg_unload_minutes  -- NEW: Estimate unloading time
+        avg_load_minutes,
+        avg_unload_minutes
     FROM locations WHERE tenant_id = p_tenant_id;
 
 END$$

@@ -1,0 +1,8 @@
+TRIP_COSTS
+scenario_id,run_date,route_name,vehicle_name,driver_name,drive_minutes_est,load_minutes_plan,unload_minutes_plan,driver_drive_rate_per_hr,driver_load_rate_per_hr,daily_insurance,daily_maintenance_cost,fuel_cost_est,driver_drive_cost_est,driver_load_cost_est,driver_unload_cost_est,driver_cost_total_est,line_item_count,total_weight_lbs,total_volume,total_cogs,entered_revenue,calculated_revenue,profit_est_entered,profit_est_calculated,margin_est_entered,margin_est_calculated
+6,2026-02-18,Demo Route,Demo Truck,Demo Driver,60.0,20.0,30.0,25.0,15.0,2.74,1.37,0.0,25.0,5.0,7.5,37.5,2,132.0,3.72,210.0,2000.84,1040.0,1749.23,788.39,0.8742,0.7581
+
+LINE_ITEMS
+product_name,quantity_loaded,items_per_unit,unit_weight_lbs,unit_volume,cost_per_item,price_per_item,total_line_weight_lbs,total_line_volume,total_line_cogs,total_line_revenue
+apples,1.00,100,42.00,1.24,0.70,2.00,42.0000,1.2400,70.0000,200.0000
+pears,2.00,140,45.00,1.24,0.50,3.00,90.0000,2.4800,140.0000,840.0000
