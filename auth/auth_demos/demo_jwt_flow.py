@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import re
 
 # DB Functions
-from db.functions import user_management
+from auth import user_management
 from db.functions.tennant_functions import scoped_create, scoped_read, scoped_delete
 import db.functions.connect
 
@@ -27,21 +27,6 @@ def connect_test_db():
         return mysql.connector.connect(**config)
     except Exception as e:
         print(f"Test DB Connection failed: {e}")
-        return None
-
-def connect_auth_db():
-    try:
-        config = {
-            'user': os.getenv("DB_USER"),
-            'password': os.getenv("DB_PASSWORD"),
-            'host': os.getenv("DB_HOST"),
-            'port': os.getenv("DB_PORT"),
-            'database': 'test_auth',
-            'connection_timeout': 10
-        }
-        return mysql.connector.connect(**config)
-    except Exception as e:
-        print(f"Auth DB Connection failed: {e}")
         return None
 
 def execute_sql_file(cursor, file_path):
@@ -152,11 +137,6 @@ def run_demo():
             if conn: conn.close()
 
     # 4. Setup Demo Data (User)
-    auth_conn = connect_auth_db()
-    if not auth_conn:
-        print("Failed to connect to Auth DB")
-        return
-
     tenant_id = None # Will be assigned upon creation
     username = "jwt_demo_user"
     password = "SecurePassword123!"
@@ -165,14 +145,15 @@ def run_demo():
 
     try:
         print("\n=== 1. Setup: Register User in DB ===")
-        existing_user = user_management.get_user_by_username(username, conn=auth_conn)
+        # We pass conn=None to let user_management use the patched global config
+        existing_user = user_management.get_user_by_username(username, conn=None)
         if existing_user:
-            user_management.delete_user(existing_user['tenant_id'], existing_user['user_id'], conn=auth_conn)
+            user_management.delete_user(existing_user['tenant_id'], existing_user['user_id'], conn=None)
         
-        user_id = user_management.create_user(username, password, email, conn=auth_conn)
+        user_id = user_management.create_user(username, password, email, conn=None)
         
         # Fetch the assigned tenant_id for cleanup later
-        created_user = user_management.get_user_by_username(username, conn=auth_conn)
+        created_user = user_management.get_user_by_username(username, conn=None)
         tenant_id = created_user['tenant_id']
         
         print(f"User created with ID: {user_id}, Tenant ID: {tenant_id}")
@@ -235,8 +216,7 @@ def run_demo():
     finally:
         print("\n=== Cleanup ===")
         if user_id and tenant_id:
-            user_management.delete_user(tenant_id, user_id, conn=auth_conn)
-        if auth_conn: auth_conn.close()
+            user_management.delete_user(tenant_id, user_id, conn=None)
 
 if __name__ == "__main__":
     run_demo()

@@ -2,7 +2,7 @@ import pytest
 import os
 import mysql.connector
 import dotenv
-from db.functions import user_management
+from auth import user_management
 
 dotenv.load_dotenv()
 
@@ -37,32 +37,6 @@ def test_create_and_delete_user(auth_connection):
     email = "test@example.com"
     role = "Admin"
     
-    # 1. Create User
-    # This calls the add_user stored procedure in the auth database
-    user_id = user_management.create_user(
-        username=username,
-        password=password,
-        email=email,
-        role="Admin",
-        conn=auth_connection
-    )
-    assert user_id is not None
-    
-    # 2. Verify in DB (Direct query since we don't have a public read_user function)
-    cursor = auth_connection.cursor(dictionary=True)
-    # Assuming standard table name 'users' and PK 'user_id' based on typical schema
-    cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
-    user_row = cursor.fetchone()
-    cursor.close()
-    
-    assert user_row is not None
-    assert user_row['username'] == username
-    assert user_row['email'] == email
-    assert user_row['role'] == "Admin"
-    # Verify password is hashed (not plain text)
-    assert user_row['password_hash'] != password
-    assert len(user_row['password_hash']) > 20
-    user_id = None
     try:
         # 1. Create User
         user_id = user_management.create_user(
@@ -109,19 +83,6 @@ def test_create_and_delete_user(auth_connection):
                     user_management.delete_user(row['tenant_id'], user_id, conn=auth_connection)
             except Exception:
                 pass
-
-    # Get the real tenant_id assigned by the DB
-    real_tenant_id = user_row['tenant_id']
-
-    # 3. Delete User
-    user_management.delete_user(real_tenant_id, user_id, conn=auth_connection)
-    
-    # 4. Verify Deletion
-    cursor = auth_connection.cursor()
-    cursor.execute("SELECT count(*) FROM users WHERE user_id = %s", (user_id,))
-    count = cursor.fetchone()[0]
-    cursor.close()
-    assert count == 0
 
 def test_create_user_validation(auth_connection):
     # Test missing username

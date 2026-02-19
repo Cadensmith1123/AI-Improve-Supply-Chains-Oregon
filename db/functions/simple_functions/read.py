@@ -1,16 +1,15 @@
 from ..connect import get_db
 import re
 
-"""simple read functions that return all entries from all columns with no 
-arguments or allows for list of columns and number of entries. Also allows 
-for a simple list  """
+"""
+Simple read functions that return entries from the database.
+Supports filtering by columns, limits, and specific IDs.
+"""
 
 
 def _cols_arg(columns):
     """
-    takes a list of column names and returns a 
-    comma separated string
-
+    Takes a list of column names and returns a comma separated string.
     :param columns: list of column names
     """
     if columns is None:
@@ -30,11 +29,8 @@ def _cols_arg(columns):
 
 def _limit_arg(limit):
     """
-    Converts strings to ints and checks if value 
-    is positive
-    
-    :param limit: string or int representing number of 
-    rows to return
+    Converts strings to ints and checks if value is positive.
+    :param limit: string or int representing number of rows to return
     """
     if limit is None:
         return None
@@ -44,9 +40,7 @@ def _limit_arg(limit):
 
 def _ids_arg(ids):
     """
-    takes a list of id's and turns them into 
-    a comma separated string.
-    
+    Takes a list of IDs and turns them into a comma separated string.
     :param ids: list of requested IDs
     """
     if ids is None:
@@ -72,8 +66,7 @@ def _ids_arg(ids):
 
 def _call_view_proc(proc_name, tenant_id, conn=None, columns=None, limit=None, ids=None):
     """
-    Helper to format proc calls then request data from MYSQL
-    
+    Helper to format proc calls then request data from MySQL.
     :param proc_name: name of procedure
     :param columns: list of columns to return or none
     :param limit: number of records to return or none
