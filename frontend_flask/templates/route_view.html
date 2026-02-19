@@ -131,7 +131,15 @@
 
     <div class="card">
       <div class="k">Route Map</div>
-      <div class="map-placeholder">Map will render here (Maps API later)</div>
+      <div style="position:relative; width:100%; height:360px;">
+        <iframe
+        src="{{ url_for('map.route_map_embed', route_id=route.route_id) }}"
+        style="position:absolute; inset:0; width:100%; height:100%; border:0;"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        allowfullscreen
+      ></iframe>
+      </div>
     </div>
 
     <div class="card">

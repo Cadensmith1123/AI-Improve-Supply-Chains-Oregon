@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Map Embed</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Mapbox GL JS CSS & JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+
+  <!-- Mapbox Directions Plugin CSS & JS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-directions/v4.1.1/mapbox-gl-directions.js"></script>
+
+  <style>
+  html, body { height:100%; margin:0; }
+  body { position: relative; }
+
+  #map { width:100%; height:100%; }
+
+  /* Info card pinned to top-left */
+  #info {
+    position: absolute;
+    top: 12px;               
+    left: 12px;             
+    display: none;
+
+    background: rgba(255,255,255,.92);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font: 13px/1.3 system-ui, Arial, sans-serif;
+    box-shadow: 0 6px 18px rgba(0,0,0,.15);
+    z-index: 2;              /* sit above map and controls */
+    pointer-events: auto;
+    max-width: min(90vw, 320px);
+  }
+  #info .value { font-weight:700; }
+
+  @media (max-width: 640px) {
+    #info { top: 8px; left: 8px; padding: 8px 10px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="info">
+    <div>From: <span id="fromLabel" class="value"></span></div>
+    <div>To: <span id="toLabel" class="value"></span></div>
+    <div>Distance: <span id="distance" class="value"></span></div>
+    <div>ETA (live): <span id="eta" class="value"></span></div>
+  </div>
+
+  <script>
+    mapboxgl.accessToken = "{{ mapbox_token }}";
+    const startAddress = {{ start_address|tojson }};
+    const endAddress   = {{ end_address|tojson }};
+
+    const OREGON = { center: [-120.554201, 43.804133], zoom: 5.2 };
+    const STYLE_TRAFFIC_DAY = 'mapbox://styles/mapbox/traffic-day-v2';
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: STYLE_TRAFFIC_DAY,
+      center: OREGON.center,
+      zoom: OREGON.zoom
+    });
+
+    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 120, unit: 'imperial' }));
+
+    const directions = new MapboxDirections({
+      accessToken: mapboxgl.accessToken,
+      unit: 'imperial',
+      profile: 'mapbox/driving-traffic',
+      alternatives: false,
+      geometries: 'geojson',
+      interactive: false,
+      controls: { inputs: false, instructions: false, profileSwitcher: false },
+      flyTo: false
+    });
+
+    let lastOrigin = null;
+    let lastDestination = null;
+
+    map.on('load', () => {
+      if (startAddress && endAddress) {
+        document.getElementById('info').style.display = 'block';
+        document.getElementById('fromLabel').textContent = startAddress;
+        document.getElementById('toLabel').textContent   = endAddress;
+
+        map.addControl(directions, 'top-left');
+
+        directions.setOrigin(startAddress);
+        directions.setDestination(endAddress);
+
+        directions.on('route', async (ev) => {
+          if (!ev.route || !ev.route[0]) return;
+          const route = ev.route[0];
+
+          const miles = route.distance / 1609.34;
+          const mins  = route.duration / 60;
+          const h = Math.floor(mins / 60);
+          const m = Math.round(mins % 60);
+          document.getElementById('distance').textContent = `${miles.toFixed(2)} mi`;
+          document.getElementById('eta').textContent      = `${h} hr ${m} min`;
+
+          fitToRoute(route);
+
+          const waypoints = directions._lastQuery?.waypoints || [];
+          if (waypoints.length >= 2) {
+            lastOrigin = [waypoints[0].location[0], waypoints[0].location[1]];
+            lastDestination = [waypoints[1].location[0], waypoints[1].location[1]];
+          }
+
+          try {
+            if (lastOrigin && lastDestination) {
+              await drawTrafficColoredRoute(lastOrigin, lastDestination);
+            }
+            //hideDirectionsRouteLayers();
+            //hideDirectionsWaypointLayersStrict();
+          } catch (err) {
+            console.error('Overlay/layers failed:', err);
+          }
+        });
+
+        map.on('style.load', hideDirectionsWaypointLayersStrict);
+      }
+    });
+
+    function fitToRoute(route) {
+      const geom = route.geometry;
+      if (!geom || geom.type !== 'LineString') return;
+      const coords = geom.coordinates;
+      const bounds = new mapboxgl.LngLatBounds();
+      coords.forEach(c => bounds.extend(c));
+      map.fitBounds(bounds, { padding: 80, duration: 700, maxZoom: 14 });
+    }
+
+    function hideDirectionsRouteLayers() {
+      const style = map.getStyle();
+      if (!style || !style.layers) return;
+      style.layers.forEach(layer => {
+        if (layer.type === 'line' && /directions-route-line/i.test(layer.id)) {
+          try { map.setPaintProperty(layer.id, 'line-opacity', 0); } catch {}
+        }
+        if (layer.type === 'line' && /directions-route-line-casing/i.test(layer.id)) {
+          try { map.setPaintProperty(layer.id, 'line-opacity', 0); } catch {}
+        }
+      });
+    }
+
+    function hideDirectionsWaypointLayersStrict() {
+      const style = map.getStyle();
+      if (!style || !style.layers) return;
+      const ids = [
+        'directions-waypoint-point',
+        'directions-waypoint-label',
+        'directions-origin-point',
+        'directions-origin-label',
+        'directions-destination-point',
+        'directions-destination-label',
+      ];
+      for (const id of ids) {
+        if (map.getLayer(id)) {
+          try { map.setLayoutProperty(id, 'visibility', 'none'); } catch {}
+          try { map.setPaintProperty(id, 'circle-opacity', 0); } catch {}
+          try { map.setPaintProperty(id, 'text-opacity', 0); } catch {}
+          try { map.setPaintProperty(id, 'icon-opacity', 0); } catch {}
+        }
+      }
+    }
+
+    async function drawTrafficColoredRoute(originLngLat, destLngLat) {
+      const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${originLngLat[0]},${originLngLat[1]};${destLngLat[0]},${destLngLat[1]}`);
+      url.searchParams.set('geometries', 'geojson');
+      url.searchParams.set('overview', 'full');
+      url.searchParams.set('steps', 'false');
+      url.searchParams.set('annotations', 'congestion');
+      url.searchParams.set('access_token', mapboxgl.accessToken);
+
+      const resp = await fetch(url.toString());
+      if (!resp.ok) throw new Error(`Directions annotations request failed: ${resp.status}`);
+      const data = await resp.json();
+      const r = data?.routes?.[0];
+      if (!r || !r.geometry || !r.legs?.length) throw new Error('No route geometry/legs');
+
+      const coords = r.geometry.coordinates;
+      const features = [];
+      let coordIndex = 0;
+
+      for (const leg of r.legs) {
+        const cong = leg.annotation?.congestion;
+        if (!cong || !Array.isArray(cong) || cong.length === 0) continue;
+
+        for (let i = 0; i < cong.length; i++) {
+          const p1 = coords[coordIndex + i];
+          const p2 = coords[coordIndex + i + 1];
+          if (!p1 || !p2) continue;
+          features.push({
+            type: 'Feature',
+            properties: { congestion: cong[i] || 'unknown' },
+            geometry: { type: 'LineString', coordinates: [p1, p2] }
+          });
+        }
+        coordIndex += cong.length;
+      }
+
+      if (features.length === 0 && coords.length > 1) {
+        features.push({
+          type: 'Feature',
+          properties: { congestion: 'unknown' },
+          geometry: { type: 'LineString', coordinates: coords }
+        });
+      }
+
+      const fc = { type: 'FeatureCollection', features };
+      const sourceId = 'route-traffic';
+      const layerId = 'route-traffic-layer';
+
+      const colorExpr = [
+        'match', ['get', 'congestion'],
+        'low',     '#2DC04B',
+        'moderate','#FFD21E',
+        'heavy',   '#FF8C1A',
+        'severe',  '#E53935',
+        /* other */ '#9e9e9e'
+      ];
+
+      if (map.getSource(sourceId)) {
+        map.getSource(sourceId).setData(fc);
+      } else {
+        map.addSource(sourceId, { type: 'geojson', data: fc });
+      }
+
+      if (!map.getLayer(layerId)) {
+        map.addLayer({
+          id: layerId,
+          type: 'line',
+          source: sourceId,
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': colorExpr, 'line-width': 7, 'line-opacity': 0.95 }
+        });
+      }
+    }
+  </script>
+</body>
+</html>
