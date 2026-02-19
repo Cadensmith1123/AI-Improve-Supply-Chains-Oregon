@@ -1,11 +1,12 @@
 # app.py
-from flask import Flask, render_template, request, redirect, url_for, abort
-import db
+import sys
+import os
 
-# app.py
-from flask import Flask, render_template, request, redirect, url_for, abort
-import db
+# Add parent directory to path so we can import 'db' package
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from flask import Flask, render_template, request, redirect, url_for, abort
+import access_db as db
 # import blueprint
 from map_route import map_bp
 
@@ -309,10 +310,7 @@ def route_load_add_post(route_id: int):
     if not product_raw:
         errors["product_id"] = "Product is required."
     else:
-        try:
-            product_id = int(product_raw)
-        except ValueError:
-            errors["product_id"] = "Choose a valid product."
+        product_id = product_raw
 
     if not qty_raw:
         errors["quantity"] = "Quantity is required."
@@ -349,10 +347,9 @@ def route_load_remove_post(route_id: int):
         abort(404)
 
     product_raw = (request.form.get("product_id") or "").strip()
-    try:
-        product_id = int(product_raw)
-    except ValueError:
+    if not product_raw:
         abort(400)
+    product_id = product_raw
 
     ok, err = db.remove_product_from_route(route_id=route_id, product_id=product_id)
     if not ok:

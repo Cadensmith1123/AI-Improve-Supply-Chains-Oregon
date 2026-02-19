@@ -1,5 +1,3 @@
-USE local_food_db;
-
 DELIMITER $$
 
 DROP PROCEDURE IF EXISTS get_planning_assets$$
