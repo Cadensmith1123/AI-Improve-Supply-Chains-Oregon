@@ -1,4 +1,3 @@
-<!-- templates/map_embed.html -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -16,7 +15,6 @@
 
   <style>
   html, body { height:100%; margin:0; }
-  /* Make the body a positioned container so absolutely positioned #info anchors to it */
   body { position: relative; }
 
   #map { width:100%; height:100%; }
@@ -24,8 +22,8 @@
   /* Info card pinned to top-left */
   #info {
     position: absolute;
-    top: 12px;               /* 👈 move from bottom to top */
-    left: 12px;              /* 👈 left corner */
+    top: 12px;               
+    left: 12px;             
     display: none;
 
     background: rgba(255,255,255,.92);
@@ -39,7 +37,6 @@
   }
   #info .value { font-weight:700; }
 
-  /* Optional: tighten on small screens */
   @media (max-width: 640px) {
     #info { top: 8px; left: 8px; padding: 8px 10px; font-size: 12px; }
   }
@@ -95,7 +92,6 @@
 
         map.addControl(directions, 'top-left');
 
-        // Use address strings (plugin will geocode automatically)
         directions.setOrigin(startAddress);
         directions.setDestination(endAddress);
 
@@ -112,7 +108,6 @@
 
           fitToRoute(route);
 
-          // Try to read resolved coords (for traffic overlay)
           const waypoints = directions._lastQuery?.waypoints || [];
           if (waypoints.length >= 2) {
             lastOrigin = [waypoints[0].location[0], waypoints[0].location[1]];
