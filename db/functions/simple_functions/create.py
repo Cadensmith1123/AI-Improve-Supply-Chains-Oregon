@@ -38,7 +38,9 @@ def add_driver(tenant_id, name, hourly_drive_wage, hourly_load_wage, conn=None):
 
 def add_vehicle(
     tenant_id,
-    name, mpg, depreciation_per_mile, annual_insurance_cost, annual_maintenance_cost,
+    name, mpg, 
+    purchase_price, yearly_mileage, salvage_value,
+    annual_insurance_cost, annual_maintenance_cost,
     max_weight_lbs, max_volume_cubic_ft, storage_type,
     conn=None
     ):
@@ -47,7 +49,9 @@ def add_vehicle(
 
     args = [
         tenant_id,
-        name, mpg, depreciation_per_mile, annual_insurance_cost,
+        name, mpg, 
+        purchase_price, yearly_mileage, salvage_value,
+        annual_insurance_cost,
         annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type
     ]
     return execute_creation_proc("add_vehicle", args, conn)

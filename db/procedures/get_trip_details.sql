@@ -19,6 +19,7 @@ BEGIN
         s.snapshot_driver_load_wage AS driver_load_rate,
         s.snapshot_vehicle_mpg AS vehicle_mpg,
         s.snapshot_gas_price AS gas_price,
+        s.snapshot_depreciation_per_mile AS depreciation_per_mile,
         s.snapshot_daily_insurance AS daily_insurance,
         s.snapshot_daily_maintenance_cost AS daily_maintenance_cost,
         s.snapshot_total_revenue AS entered_revenue,

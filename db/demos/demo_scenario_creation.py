@@ -102,7 +102,7 @@ if __name__ == "__main__":
         loc2_id = create.add_location(tenant_id, "Demo Store", "Store", "456 Ave", "City", "OR", "97000", "555-1313", 0, 0, 30, 30, conn=conn)
         route_id = create.add_route(tenant_id, "Demo Route", loc1_id, loc2_id, conn=conn)
         driver_id = create.add_driver(tenant_id, "Demo Driver", 25.00, 15.00, conn=conn)
-        vehicle_id = create.add_vehicle(tenant_id, "Demo Truck", 10.0, 0.5, 1000, 500, 10000, 1000, "Dry", conn=conn)
+        vehicle_id = create.add_vehicle(tenant_id, "Demo Truck", 10.0, 50000.00, 20000.00, 5000.00, 1000, 500, 10000, 1000, "Dry", conn=conn)
 
         print("Running Scenario Demo")
         trip_details, scen_id = test_scenario_creation_with_manifest(route_id, "test.csv", conn=conn)

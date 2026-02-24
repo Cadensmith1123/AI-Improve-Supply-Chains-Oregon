@@ -56,7 +56,9 @@ CREATE PROCEDURE add_vehicle(
     IN p_tenant_id INT,
     IN p_name VARCHAR(100),
     IN p_mpg DECIMAL(4,1),
-    IN p_depreciation DECIMAL(5,3),
+    IN p_purchase_price DECIMAL(10,2),
+    IN p_yearly_mileage DECIMAL(10,2),
+    IN p_salvage_value DECIMAL(10,2),
     IN p_insurance DECIMAL(10,2),
     IN p_maintenance DECIMAL(10,2),
     IN p_weight DECIMAL(10,2),
@@ -64,8 +66,8 @@ CREATE PROCEDURE add_vehicle(
     IN p_storage VARCHAR(10)
 )
 BEGIN
-    INSERT INTO vehicles (tenant_id, name, mpg, depreciation_per_mile, annual_insurance_cost, annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type)
-    VALUES (p_tenant_id, p_name, p_mpg, p_depreciation, p_insurance, p_maintenance, p_weight, p_volume, p_storage);
+    INSERT INTO vehicles (tenant_id, name, mpg, vehicle_purchase_price, vehicle_estimated_yearly_milage, vehicle_estimated_salvage_value, annual_insurance_cost, annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type)
+    VALUES (p_tenant_id, p_name, p_mpg, p_purchase_price, p_yearly_mileage, p_salvage_value, p_insurance, p_maintenance, p_weight, p_volume, p_storage);
     SELECT LAST_INSERT_ID();
 END $$
 

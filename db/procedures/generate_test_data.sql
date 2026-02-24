@@ -39,10 +39,10 @@ BEGIN
     INSERT INTO drivers (tenant_id, name, hourly_drive_wage, hourly_load_wage) VALUES 
     (1, 'Steve', 22.00, 15.00), (1, 'Holly', 25.00, 18.00), (1, 'Mike', 20.00, 15.00);
     
-    INSERT INTO vehicles (tenant_id, name, mpg, depreciation_per_mile, annual_insurance_cost, annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type) VALUES 
-    (1, 'Sprinter Van', 18.0, 0.15, 1200.00, 1000.00, 2500, 300, 'Ref'),
-    (1, 'Box Truck A', 10.0, 0.35, 2400.00, 1500.00, 8000, 800, 'Dry'),
-    (1, 'Reefer Truck Big', 8.5, 0.55, 3000.00, 1800.00, 12000, 1200, 'Frz');
+    INSERT INTO vehicles (tenant_id, name, mpg, vehicle_purchase_price, vehicle_estimated_yearly_milage, vehicle_estimated_salvage_value, annual_insurance_cost, annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type) VALUES 
+    (1, 'Sprinter Van', 18.0, 45000.00, 20000.00, 10000.00, 1200.00, 1000.00, 2500, 300, 'Ref'),
+    (1, 'Box Truck A', 10.0, 85000.00, 30000.00, 15000.00, 2400.00, 1500.00, 8000, 800, 'Dry'),
+    (1, 'Reefer Truck Big', 8.5, 120000.00, 40000.00, 20000.00, 3000.00, 1800.00, 12000, 1200, 'Frz');
 
     -- 5. SUPPLY
     INSERT INTO supply (tenant_id, entity_id, location_id, product_code, quantity_available, unit_weight_lbs, unit_volume_cu_ft, items_per_handling_unit, cost_per_item) VALUES 

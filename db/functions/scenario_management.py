@@ -18,6 +18,10 @@ def _to_dec(x):
     return Decimal(str(x)) if x not in (None, "") else None
 
 
+def calculate_depreciation(purchase_price, salvage_value, yearly_mileage):
+    return Decimal("3.000")
+
+
 def create_scenario(
         tenant_id,
         route_id,
@@ -57,6 +61,15 @@ def create_scenario(
     if run_date in ("", None):
         run_date = date.today()
 
+    depreciation = Decimal("0.0")
+    if vehicle_id:
+        v_rows = read.view_vehicles(tenant_id, conn=conn, ids=vehicle_id)
+        if v_rows:
+            v = v_rows[0]
+            depreciation = calculate_depreciation(
+                v.get('vehicle_purchase_price'), v.get('vehicle_estimated_salvage_value'), v.get('vehicle_estimated_yearly_milage')
+            )
+
     should_close = False
     if conn is None:
         conn = get_db()
@@ -76,6 +89,7 @@ def create_scenario(
             run_date,
             current_gas_price,
             total_revenue,
+            depreciation,
             0
         ]
         result = cur.callproc("create_trip_header", args)
@@ -120,6 +134,16 @@ def update_scenario(
     if conn is None:
         raise RuntimeError("Failed to connect to database")
 
+    # Calculate depreciation if vehicle is being updated
+    depreciation = None
+    if vehicle_id is not None:
+        v_rows = read.view_vehicles(tenant_id, conn=conn, ids=vehicle_id)
+        if v_rows:
+            v = v_rows[0]
+            depreciation = calculate_depreciation(
+                v.get('vehicle_purchase_price'), v.get('vehicle_estimated_salvage_value'), v.get('vehicle_estimated_yearly_milage')
+            )
+
     try:
         cur = conn.cursor(dictionary=True)
 
@@ -132,6 +156,7 @@ def update_scenario(
             run_date if run_date not in (None, "") else None,
             _to_dec(current_gas_price),
             _to_dec(total_revenue),
+            depreciation
         ]
 
         cur.callproc("update_trip_header", args)
@@ -286,6 +311,7 @@ def get_trip_details(tenant_id, scenario_id, conn=None):
         "driver_load_rate",
         "vehicle_mpg",
         "gas_price",
+        "depreciation_per_mile",
         "daily_insurance",
         "daily_maintenance_cost",
         "entered_revenue",
@@ -326,7 +352,7 @@ def get_trip_details(tenant_id, scenario_id, conn=None):
     return {"header": header, "items": items, "totals": totals}
 
 
-def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0):
+def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, miles_est=50.0):
     header = trip_details["header"]
     items = trip_details["items"]
     totals = trip_details.get("totals") or {}
@@ -335,6 +361,7 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0):
     drive_rate = float(header.get("driver_drive_rate") or 0)
     load_rate = float(header.get("driver_load_rate") or 0)
     daily_ins = float(header.get("daily_insurance") or 0)
+    depreciation_rate = float(header.get("depreciation_per_mile") or 0)
     daily_maintenance_cost = float(header.get("daily_maintenance_cost") or 0)
 
     load_min = float(header.get("plan_load_min") or 0)
@@ -347,6 +374,9 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0):
     driver_unload_cost = (unload_min / 60) * load_rate
     driver_total_cost = driver_drive_cost + driver_load_cost + driver_unload_cost
 
+    # Asset costs
+    depreciation_cost = miles_est * depreciation_rate
+
     # Prefer proc totals (more robust), but fall back to summing items
     total_cogs = float(totals.get("total_cogs") or sum(float(x.get("total_line_cogs") or 0) for x in items))
     total_weight = float(totals.get("total_weight_lbs") or sum(float(x.get("total_line_weight_lbs") or 0) for x in items))
@@ -355,7 +385,7 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0):
     entered_revenue = float(totals.get("entered_revenue") or header.get("entered_revenue") or 0)
     calculated_revenue = float(totals.get("calculated_revenue") or sum(float(x.get("total_line_revenue") or 0) for x in items))
 
-    total_cost_est = total_cogs + driver_total_cost + daily_ins + daily_maintenance_cost + float(fuel_cost_est)
+    total_cost_est = total_cogs + driver_total_cost + daily_ins + daily_maintenance_cost + float(fuel_cost_est) + depreciation_cost
 
     profit_vs_entered = entered_revenue - total_cost_est
     profit_vs_calculated = calculated_revenue - total_cost_est
@@ -376,6 +406,7 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0):
 
         "daily_insurance": daily_ins,
         "daily_maintenance_cost": daily_maintenance_cost,
+        "depreciation_cost_est": round(depreciation_cost, 2),
         "fuel_cost_est": round(float(fuel_cost_est), 2),
 
         "driver_drive_cost_est": round(driver_drive_cost, 2),

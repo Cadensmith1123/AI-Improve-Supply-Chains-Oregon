@@ -60,10 +60,9 @@ def get_vehicle(vehicle_id: int):
         return rows[0]
     return None
 
-def create_vehicle(vehicle_name: str, mpg: str, fuel_price: str, capacity: str):
+def create_vehicle(vehicle_name: str, mpg: str, fuel_price: str, capacity: str, purchase_price: str = None, yearly_mileage: str = None, salvage_value: str = None):
     tid = _get_tenant_id()
     try:
-        # capacity -> max_weight_lbs parsing
         cap_val = 1000
         if capacity:
             try:
@@ -75,7 +74,9 @@ def create_vehicle(vehicle_name: str, mpg: str, fuel_price: str, capacity: str):
             tenant_id=tid,
             name=vehicle_name,
             mpg=float(mpg) if mpg else 10.0,
-            depreciation_per_mile=0.0,
+            purchase_price=float(purchase_price) if purchase_price else 0.0,
+            yearly_mileage=float(yearly_mileage) if yearly_mileage else 0.0,
+            salvage_value=float(salvage_value) if salvage_value else 0.0,
             annual_insurance_cost=0.0,
             annual_maintenance_cost=0.0,
             max_weight_lbs=cap_val,
