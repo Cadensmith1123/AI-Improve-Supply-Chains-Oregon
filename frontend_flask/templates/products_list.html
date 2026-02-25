@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Products</title>
+  <title>Product Types</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 24px; }
     table { border-collapse: collapse; width: 100%; max-width: 1100px; }
@@ -15,23 +15,19 @@
   </style>
 </head>
 <body>
-  <h1>Products</h1>
+  <h1>Product Types</h1>
 
   <div class="nav">
     <a href="/routes">Routes</a>
-   
+    <a href="/products/new">+ New Product Type</a>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th>product_id</th>
-        <th>product_name</th>
-        <th>sku</th>
-        <th>category</th>
-        <th>unit</th>
-        <th>unit_price</th>
-        <th>quantity</th>
+        <th>product_code</th>
+        <th>name</th>
+        <th>storage_type</th>
         <th>actions</th>
       </tr>
     </thead>
@@ -39,26 +35,10 @@
     <tbody>
       {% for p in products %}
         <tr>
-          <td>{{ p.product_id }}</td>
-          <td>{{ p.product_name }}</td>
-          <td>{{ p.sku }}</td>
-          <td>{{ p.category }}</td>
-          <td>{{ p.unit }}</td>
-          <td>
-            {% if p.unit_price is not none %}
-              ${{ "%.2f"|format(p.unit_price) }}
-            {% else %}
-              <em>—</em>
-            {% endif %}
-          </td>
-          <td>
-            {% if p.quantity is not none %}
-              {{ p.quantity }}
-            {% else %}
-              <em>—</em>
-            {% endif %}
-          </td>
-          <td><a href="/products/{{ p.product_id }}/edit">Edit</a></td>
+          <td>{{ p.product_code }}</td>
+          <td>{{ p.name }}</td>
+          <td>{{ p.storage_type }}</td>
+          <td><a href="/products/{{ p.product_code }}/edit">Edit</a></td>
         </tr>
       {% endfor %}
     </tbody>
