@@ -62,7 +62,9 @@ def update_driver(tenant_id, driver_id, name, hourly_drive_wage, hourly_load_wag
 
 
 def update_vehicle(
-    tenant_id, vehicle_id, name, mpg, depreciation_per_mile, annual_insurance_cost,
+    tenant_id, vehicle_id, name, mpg, 
+    purchase_price, yearly_mileage, salvage_value,
+    annual_insurance_cost,
     annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type,
     conn=None
 ):
@@ -70,7 +72,9 @@ def update_vehicle(
         raise ValueError(f"Invalid vehicle storage type: {storage_type}")
 
     args = [
-        tenant_id, vehicle_id, name, mpg, depreciation_per_mile, annual_insurance_cost,
+        tenant_id, vehicle_id, name, mpg, 
+        purchase_price, yearly_mileage, salvage_value,
+        annual_insurance_cost,
         annual_maintenance_cost, max_weight_lbs, max_volume_cubic_ft, storage_type
     ]
     _execute_update_proc("update_vehicle", args, conn)
@@ -107,6 +111,7 @@ def update_scenario(
     tenant_id, scenario_id, route_id, vehicle_id, driver_id, run_date,
     snapshot_driver_wage, snapshot_driver_load_wage,
     snapshot_vehicle_mpg, snapshot_gas_price,
+    snapshot_depreciation_per_mile,
     snapshot_daily_insurance, snapshot_daily_maintenance_cost,
     snapshot_planned_load_minutes, snapshot_planned_unload_minutes,
     actual_load_minutes, actual_unload_minutes, snapshot_total_revenue,
@@ -116,6 +121,7 @@ def update_scenario(
         tenant_id, scenario_id, route_id, vehicle_id, driver_id, run_date,
         snapshot_driver_wage, snapshot_driver_load_wage,
         snapshot_vehicle_mpg, snapshot_gas_price,
+        snapshot_depreciation_per_mile,
         snapshot_daily_insurance, snapshot_daily_maintenance_cost,
         snapshot_planned_load_minutes, snapshot_planned_unload_minutes,
         actual_load_minutes, actual_unload_minutes, snapshot_total_revenue

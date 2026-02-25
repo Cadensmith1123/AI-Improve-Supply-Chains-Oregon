@@ -40,8 +40,9 @@ BEGIN
     -- 3. VEHICLES (Constraints & Costs)
     SELECT 
         vehicle_id, name, 
-        max_weight_lbs, max_volume_cubic_ft, storage_capability,
-        mpg, depreciation_per_mile, annual_insurance_cost
+        mpg, vehicle_purchase_price, vehicle_estimated_yearly_milage, vehicle_estimated_salvage_value,
+        annual_insurance_cost, annual_maintenance_cost,
+        max_weight_lbs, max_volume_cubic_ft, storage_type
     FROM vehicles WHERE tenant_id = p_tenant_id;
 
     -- 4. DRIVERS (Wage Rates)

@@ -11,7 +11,8 @@ CREATE PROCEDURE update_trip_header(
     IN p_driver_id INT,
     IN p_run_date DATE,
     IN p_current_gas_price DECIMAL(6,3),
-    IN p_total_revenue DECIMAL(12,2)
+    IN p_total_revenue DECIMAL(12,2),
+    IN p_depreciation DECIMAL(5,3)
 )
 BEGIN
     -- Current values
@@ -26,6 +27,7 @@ BEGIN
     DECLARE v_driver_wage DECIMAL(5,2);
     DECLARE v_driver_load_wage DECIMAL(5,2);
     DECLARE v_vehicle_mpg DECIMAL(4,1);
+    DECLARE v_depreciation DECIMAL(5,3);
     DECLARE v_annual_insurance DECIMAL(10,2);
     DECLARE v_annual_maintenance DECIMAL(10,2);
     DECLARE v_load_time INT;
@@ -80,6 +82,7 @@ BEGIN
     -- Vehicle snapshot (if vehicle changed)
     IF v_new_vehicle_id IS NULL THEN
         SET v_vehicle_mpg = 0.0;
+        SET v_depreciation = 0.000;
         SET v_annual_insurance = 0.00;
         SET v_annual_maintenance = 0.00;
     ELSEIF v_new_vehicle_id <> v_vehicle_id OR v_vehicle_id IS NULL THEN
@@ -87,9 +90,10 @@ BEGIN
         INTO v_vehicle_mpg, v_annual_insurance, v_annual_maintenance
         FROM vehicles
         WHERE vehicle_id = v_new_vehicle_id AND tenant_id = p_tenant_id;
+        SET v_depreciation = p_depreciation;
     ELSE
-        SELECT snapshot_vehicle_mpg, (snapshot_daily_insurance * 365.0), (snapshot_daily_maintenance_cost * 365.0)
-        INTO v_vehicle_mpg, v_annual_insurance, v_annual_maintenance
+        SELECT snapshot_vehicle_mpg, snapshot_depreciation_per_mile, (snapshot_daily_insurance * 365.0), (snapshot_daily_maintenance_cost * 365.0)
+        INTO v_vehicle_mpg, v_depreciation, v_annual_insurance, v_annual_maintenance
         FROM scenarios
         WHERE scenario_id = p_scenario_id AND tenant_id = p_tenant_id;
     END IF;
@@ -127,6 +131,7 @@ BEGIN
         snapshot_vehicle_mpg = COALESCE(v_vehicle_mpg, snapshot_vehicle_mpg),
 
         snapshot_gas_price = COALESCE(p_current_gas_price, snapshot_gas_price),
+        snapshot_depreciation_per_mile = COALESCE(v_depreciation, snapshot_depreciation_per_mile),
 
         snapshot_daily_insurance = COALESCE((COALESCE(v_annual_insurance, 0.00) / 365.0), snapshot_daily_insurance),
         snapshot_daily_maintenance_cost = COALESCE((COALESCE(v_annual_maintenance, 0.00) / 365.0), snapshot_daily_maintenance_cost),

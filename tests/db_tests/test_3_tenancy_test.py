@@ -167,7 +167,7 @@ def test_vehicle_isolation(connection):
     tenant_a = 1
     tenant_b = 2
     
-    v_id = create.add_vehicle(tenant_a, "Truck A", 10.0, 0.5, 1000, 500, 10000, 1000, "Dry", conn=connection)
+    v_id = create.add_vehicle(tenant_a, "Truck A", 10.0, 45000.00, 20000.00, 5000.00, 1000, 500, 10000, 1000, "Dry", conn=connection)
     connection.commit()
     
     rows_a = read.view_vehicles(tenant_a, connection, ids=v_id)
