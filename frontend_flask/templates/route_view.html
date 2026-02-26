@@ -1,4 +1,3 @@
-<!-- templates/route_view.html -->
 <!doctype html>
 <html>
 <head>
@@ -20,6 +19,9 @@
     body { font-family: Arial, sans-serif; margin:0; background:var(--bg); color:var(--text); }
     .wrap { max-width: 1100px; margin: 28px auto; padding: 0 18px; }
 
+    .topbar{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom: 16px; }
+    .actions{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+
     .top{
       display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; gap:12px;
     }
@@ -38,6 +40,10 @@
       text-decoration:none;
       display:inline-block;
     }
+    .btn.small{ padding: 7px 10px; border-radius: 10px; font-size: 12px; }
+    .btn.primary{ background: var(--brand); color: #fff; border-color: transparent; }
+    .btn:hover{ filter: brightness(.98); }
+    .btn:active{ transform: translateY(1px); }
 
     .card{
       background: var(--card);
@@ -69,11 +75,55 @@
       color:#6b7280;
       font-weight:800;
     }
+
+    /* Modal Styles */
+    .modal-backdrop{
+      position:fixed; inset:0; background: rgba(15,23,42,.55);
+      display:none; align-items:center; justify-content:center;
+      padding: 18px; z-index: 50;
+    }
+    .modal{
+      width: min(920px, 100%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .modal-header{
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      background: #fbfdff;
+    }
+    .modal-title{ font-weight: 900; }
+    .x{
+      border:1px solid var(--border); background:#fff; border-radius: 12px;
+      padding: 8px 10px; cursor:pointer; font-weight:900; color:#334155;
+    }
+    .modal-body{ padding: 16px; }
+    .field{ margin: 10px 0; }
+    label{ display:block; font-weight:900; font-size: 12px; color:#334155; margin-bottom: 6px; }
+    input, select{
+      width:100%; padding: 10px 10px;
+      border:1px solid var(--border); border-radius: 12px; outline: none;
+      background:#fff;
+    }
+    input:focus, select:focus{ border-color: rgba(29,73,155,.5); box-shadow: 0 0 0 3px rgba(29,73,155,.12); }
+    .hint{ font-size: 12px; color: var(--muted); margin-top:6px; }
+    .modal-actions{
+      display:flex; justify-content:flex-end; gap:10px;
+      padding: 14px 16px; border-top: 1px solid var(--border); background:#fbfdff;
+    }
+    .manifest-card{ border:1px solid var(--border); border-radius: 12px; overflow:hidden; background:#fff; }
+    .manifest-table th{ background:#f8fafc; }
+    .manifest-table th, .manifest-table td{ padding: 10px; border-bottom:1px solid var(--border); }
+    .manifest-table td:last-child{ text-align:right; }
   </style>
 </head>
 
 <body>
   <div class="wrap">
+    {% include 'header.html' %}
 
     <div class="top">
       <div>
@@ -83,6 +133,7 @@
 
       <div style="display:flex; gap:10px;">
         <a class="btn" href="/routes">Back</a>
+        <a class="btn" href="{{ url_for('routes.route_export_csv', route_id=route.route_id) }}">Export CSV</a>
         <a class="btn" href="/routes/{{ route.route_id }}/edit">Edit</a>
       </div>
     </div>
@@ -106,25 +157,107 @@
     <div class="card">
       <div class="grid2">
         <div>
-          <div class="k">Vehicle</div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="k">Vehicle</div>
+            <button class="btn small" id="btnAssignVehicle" style="margin-bottom:4px;">Assign</button>
+          </div>
           {% if vehicle %}
-            <div class="v">{{ vehicle.vehicle_name }}</div>
-            <div class="muted">MPG: {{ vehicle.mpg }}</div>
-            <div class="muted">Fuel $/gal: {{ vehicle.fuel_price }}</div>
-            <div class="muted">Capacity: {{ vehicle.capacity }}</div>
+            <div class="v" style="margin-bottom:6px;">{{ vehicle.vehicle_name }}</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+              <div>
+                <div class="muted">Type: {{ vehicle.storage_type }}</div>
+                <div class="muted">MPG: {{ vehicle.mpg }}</div>
+                <div class="muted">Max Weight: {{ vehicle.max_weight_lbs }} lbs</div>
+                <div class="muted">Max Volume: {{ vehicle.max_volume_cubic_ft }} cu ft</div>
+              </div>
+              <div>
+                <div class="muted">Purchase: ${{ "%.2f"|format(vehicle.vehicle_purchase_price) }}</div>
+                <div class="muted">Est. Miles: {{ vehicle.vehicle_estimated_yearly_milage }}</div>
+                <div class="muted">Salvage: ${{ "%.2f"|format(vehicle.vehicle_estimated_salvage_value) }}</div>
+                <div class="muted">Insurance: ${{ "%.2f"|format(vehicle.annual_insurance_cost) }}</div>
+                <div class="muted">Maint: ${{ "%.2f"|format(vehicle.annual_maintenance_cost) }}</div>
+              </div>
+            </div>
           {% else %}
             <div class="muted">Unassigned</div>
           {% endif %}
         </div>
 
         <div>
-          <div class="k">Financials</div>
-          <div class="muted">Base Sales: ${{ "%.2f"|format(base_sales) }}</div>
-          <div class="muted">Products Subtotal: ${{ "%.2f"|format(manifest_subtotal) }}</div>
-          <div class="muted" style="font-weight:900; color:#0f172a;">
-            Total Sales: ${{ "%.2f"|format(route.sales_amount) }}
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="k">Driver</div>
+            <button class="btn small" id="btnAssignDriver" style="margin-bottom:4px;">Assign</button>
           </div>
-          <div class="muted">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
+          {% if driver %}
+            <div class="v">{{ driver.name }}</div>
+            <div class="muted">Drive Wage: ${{ "%.2f"|format(driver.hourly_drive_wage) }}/hr</div>
+            <div class="muted">Load Wage: ${{ "%.2f"|format(driver.hourly_load_wage) }}/hr</div>
+          {% else %}
+            <div class="muted">Unassigned</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div class="k">Financial Metrics</div>
+        <button class="btn small" id="btnRecalcCosts">Recalculate Costs</button>
+      </div>
+      
+      <div style="margin-bottom:16px;">
+        <div class="muted" style="margin-bottom:4px;">Time & Rates</div>
+        <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:12px;">
+           <div><div class="mini">Drive Mins</div><div class="v">{{ route.drive_minutes_est }}</div></div>
+           <div><div class="mini">Load Mins</div><div class="v">{{ route.load_minutes_plan }}</div></div>
+           <div><div class="mini">Unload Mins</div><div class="v">{{ route.unload_minutes_plan }}</div></div>
+           <div><div class="mini">Distance</div><div class="v">{{ route.total_distance_miles }} mi</div></div>
+           <div><div class="mini">Gas Price</div><div class="v">${{ "%.2f"|format(route.gas_price) }}/gal</div></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px; border-top:1px solid var(--border); padding-top:12px;">
+        <div class="muted" style="margin-bottom:4px;">Cost Breakdown</div>
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px;">
+           <div><div class="mini">Driver (Drive)</div><div class="v">${{ "%.2f"|format(route.driver_drive_cost_est) }}</div></div>
+           <div><div class="mini">Driver (Load)</div><div class="v">${{ "%.2f"|format(route.driver_load_cost_est) }}</div></div>
+           <div><div class="mini">Driver (Unload)</div><div class="v">${{ "%.2f"|format(route.driver_unload_cost_est) }}</div></div>
+           <div><div class="mini">Total Driver</div><div class="v">${{ "%.2f"|format(route.driver_cost_total_est) }}</div></div>
+           
+           <div><div class="mini">Fuel</div><div class="v">${{ "%.2f"|format(route.fuel_cost_est) }}</div></div>
+           <div><div class="mini">Depreciation</div><div class="v">${{ "%.2f"|format(route.depreciation_cost_est) }}</div></div>
+           <div><div class="mini">Daily Insurance</div><div class="v">${{ "%.2f"|format(route.daily_insurance) }}</div></div>
+           <div><div class="mini">Daily Maintenance</div><div class="v">${{ "%.2f"|format(route.daily_maintenance_cost) }}</div></div>
+           <div><div class="mini">COGS</div><div class="v">${{ "%.2f"|format(route.total_cogs) }}</div></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px; border-top:1px solid var(--border); padding-top:12px;">
+        <div class="muted" style="margin-bottom:4px;">Load Stats</div>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+           <div><div class="mini">Items</div><div class="v">{{ route.line_item_count }}</div></div>
+           <div><div class="mini">Total Weight</div><div class="v">{{ route.total_weight_lbs }} lbs</div></div>
+           <div><div class="mini">Total Volume</div><div class="v">{{ route.total_volume }} cu ft</div></div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border); padding-top:12px;">
+        <div class="muted" style="margin-bottom:4px;">Profitability (Entered vs Calculated)</div>
+        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+           <div>
+             <div class="mini">Entered Revenue</div>
+             <div class="v">${{ "%.2f"|format(route.entered_revenue) }}</div>
+             <div class="mini" style="margin-top:4px;">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
+             <div class="mini">Profit: ${{ "%.2f"|format(route.profit_est_entered) }}</div>
+             <div class="mini">Margin: {{ "%.1f"|format(route.margin_est_entered * 100) }}%</div>
+           </div>
+           <div>
+             <div class="mini">Calculated Revenue</div>
+             <div class="v">${{ "%.2f"|format(route.calculated_revenue) }}</div>
+             <div class="mini" style="margin-top:4px;">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
+             <div class="mini">Profit: ${{ "%.2f"|format(route.profit_est_calculated) }}</div>
+             <div class="mini">Margin: {{ "%.1f"|format(route.margin_est_calculated * 100) }}%</div>
+           </div>
         </div>
       </div>
     </div>
@@ -143,7 +276,10 @@
     </div>
 
     <div class="card">
-      <div class="k">Manifest</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div class="k">Manifest</div>
+        <button class="btn small" id="btnManageLoad">Manage Load</button>
+      </div>
       <table>
         <thead>
           <tr>
@@ -178,6 +314,211 @@
       </table>
     </div>
 
+    {% include 'modal_assign_vehicle.html' %}
+    {% include 'modal_assign_driver.html' %}
+    {% include 'modal_manage_load.html' %}
+    
+    <!-- Header Management Modals -->
+    {% include 'modal_route.html' %}
+    {% include 'modal_product.html' %}
+    {% include 'modal_vehicle.html' %}
+    {% include 'modal_driver.html' %}
+    {% include 'modal_location.html' %}
+
   </div>
+
+  <script>
+    const routeId = {{ route.route_id }};
+    const currentVehicleId = "{{ route.vehicle_id if route.vehicle_id else '' }}";
+    const currentDriverId = "{{ route.driver_id if route.driver_id else '' }}";
+    let manifestData = {{ manifest | tojson }};
+    const productsData = {{ products | tojson }};
+    const vehiclesData = {{ vehicles | tojson }};
+    const driversData = {{ drivers | tojson }};
+    const locationsData = {{ locations | tojson }};
+    const routesData = {{ routes | tojson }};
+    let loadChanged = false;
+
+    const backdrops = document.querySelectorAll(".modal-backdrop");
+
+    function openModal(id){
+      const el = document.getElementById(id);
+      if(el){ el.style.display = "flex"; }
+    }
+    function closeModal(el){
+      if (el.id === "modal-manage-load" && loadChanged) {
+        window.location.reload();
+        return;
+      }
+      el.style.display = "none";
+    }
+
+    document.querySelectorAll("[data-open]").forEach(b => {
+      b.addEventListener("click", () => openModal(b.dataset.open));
+    });
+
+    document.querySelectorAll("[data-close]").forEach(b => {
+      b.addEventListener("click", () => {
+        const bd = b.closest(".modal-backdrop");
+        if(bd) closeModal(bd);
+      });
+    });
+
+    backdrops.forEach(bd => bd.addEventListener("click", (e) => {
+      if(e.target === bd) closeModal(bd);
+    }));
+
+    window.addEventListener("keydown", (e) => {
+      if(e.key === "Escape") backdrops.forEach(bd => {
+        if (bd.style.display === "flex") closeModal(bd);
+      });
+    });
+
+    // Assign Vehicle Logic
+    document.getElementById("btnAssignVehicle").addEventListener("click", () => {
+      const form = document.getElementById("assignVehicleForm");
+      form.action = `/routes/${routeId}/assign-vehicle`;
+      document.getElementById("assignVehicleSelect").value = currentVehicleId;
+      openModal("modal-assign-vehicle");
+    });
+
+    // Assign Driver Logic
+    document.getElementById("btnAssignDriver").addEventListener("click", () => {
+      const form = document.getElementById("assignDriverForm");
+      form.action = `/routes/${routeId}/assign-driver`;
+      document.getElementById("assignDriverSelect").value = currentDriverId;
+      openModal("modal-assign-driver");
+    });
+
+    // Recalculate Costs Logic
+    document.getElementById("btnRecalcCosts").addEventListener("click", async () => {
+      if(!confirm("This will update cost snapshots (wages, mpg, etc.) from the current master data. Continue?")) return;
+      
+      try {
+        const res = await fetch(`/routes/${routeId}/recalc`, { method: "POST" });
+        const data = await res.json();
+        if(data.success) window.location.reload();
+        else alert("Error: " + data.message);
+      } catch(e) {
+        alert("Error recalculating costs.");
+      }
+    });
+
+    // Manage Load Logic
+    function renderManifest(manifest){
+      const tbody = document.getElementById("manifestBody");
+      tbody.innerHTML = "";
+
+      if(!manifest.length){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td class="muted" colspan="3" style="padding:12px;">No products on this route yet.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      manifest.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td style="font-weight:900;">${item.product_name}</td>
+          <td>${item.quantity}</td>
+          <td>
+            <button class="btn small remove-item-btn" type="button" 
+              data-route-id="${routeId}" 
+              data-product-id="${item.product_id}">Remove</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById("btnManageLoad").addEventListener("click", () => {
+      loadChanged = false;
+      renderManifest(manifestData);
+      const addForm = document.getElementById("addToLoadForm");
+      addForm.action = `/routes/${routeId}/load/add`;
+      document.getElementById("loadProductSelect").value = "";
+      document.getElementById("loadQtyInput").value = "";
+      document.getElementById("loadItemsPerUnitInput").value = "";
+      document.getElementById("loadPriceInput").value = "";
+      document.getElementById("loadCostInput").value = "";
+      document.getElementById("loadWeightInput").value = "";
+      document.getElementById("loadVolumeInput").value = "";
+      openModal("modal-manage-load");
+    });
+
+    // Handle "Add to Load" form submission via AJAX
+    const addToLoadForm = document.getElementById("addToLoadForm");
+    addToLoadForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const action = addToLoadForm.getAttribute("action");
+      const formData = new FormData(addToLoadForm);
+
+      try {
+        const res = await fetch(action, {
+          method: "POST",
+          body: formData,
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          loadChanged = true;
+          manifestData = data.manifest; // Update local data
+          renderManifest(manifestData);
+          
+          // Clear inputs
+          document.getElementById("loadProductSelect").value = "";
+          document.getElementById("loadQtyInput").value = "";
+          document.getElementById("loadItemsPerUnitInput").value = "";
+          document.getElementById("loadPriceInput").value = "";
+          document.getElementById("loadCostInput").value = "";
+          document.getElementById("loadWeightInput").value = "";
+          document.getElementById("loadVolumeInput").value = "";
+          
+          // Optional: Reload page background if you want totals to update, 
+          // but for now we just keep the modal open as requested.
+        } else {
+          alert("Error: " + JSON.stringify(data.errors || data.message));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("An error occurred while updating the load.");
+      }
+    });
+
+    // Handle "Remove" button clicks via AJAX
+    document.getElementById("manifestBody").addEventListener("click", async (e) => {
+      if (e.target.classList.contains("remove-item-btn")) {
+        const btn = e.target;
+        const productId = btn.dataset.productId;
+        
+        const formData = new FormData();
+        formData.append("product_id", productId);
+
+        try {
+          const res = await fetch(`/routes/${routeId}/load/remove`, {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          });
+          
+          const data = await res.json();
+          
+          if (data.success) {
+            loadChanged = true;
+            manifestData = data.manifest;
+            renderManifest(manifestData);
+          } else {
+            alert("Error removing item: " + (data.message || "Unknown error"));
+          }
+        } catch (err) {
+          console.error(err);
+          alert("An error occurred while removing the item.");
+        }
+      }
+    });
+  </script>
 </body>
 </html>

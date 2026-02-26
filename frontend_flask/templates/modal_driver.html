@@ -1,0 +1,86 @@
+  <!-- NEW DRIVER MODAL -->
+  <div class="modal-backdrop" id="modal-driver">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Manage Drivers</div>
+        <button class="x" data-close>&times;</button>
+      </div>
+
+      <form method="post" action="/drivers/new" id="driverForm">
+        <div class="modal-body">
+          <div class="field">
+            <label>Select Driver to Edit</label>
+            <select id="driverSelect">
+              <option value="">-- Add New Driver --</option>
+              <!-- Populated by JS -->
+            </select>
+          </div>
+          <hr style="border:0; border-top:1px solid #e2e8f0; margin:16px 0;">
+
+          <div class="field">
+            <label>Driver Name</label>
+            <input name="name" id="drvName" placeholder="e.g., John Doe" required>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Hourly Drive Wage ($)</label>
+              <input name="hourly_drive_wage" id="drvDrive" placeholder="e.g., 25.00">
+            </div>
+
+            <div class="field">
+              <label>Hourly Load Wage ($)</label>
+              <input name="hourly_load_wage" id="drvLoad" placeholder="e.g., 18.50">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn" type="button" id="btnDeleteDriver" style="background-color:#dc2626; color:white; border:0; margin-right:auto; display:none;">Delete</button>
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn primary" type="submit">Add Driver</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const sel = document.getElementById("driverSelect");
+      if(!sel) return;
+
+      // Populate
+      driversData.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d.driver_id;
+        opt.textContent = d.name;
+        sel.appendChild(opt);
+      });
+
+      // Handle Change
+      sel.addEventListener("change", () => {
+        const val = sel.value;
+        const form = document.getElementById("driverForm");
+        const btnDel = document.getElementById("btnDeleteDriver");
+        
+        if(!val) {
+          // Add New
+          form.action = "/drivers/new";
+          document.getElementById("drvName").value = "";
+          document.getElementById("drvDrive").value = "";
+          document.getElementById("drvLoad").value = "";
+          if(btnDel) btnDel.style.display = "none";
+        } else {
+          // Edit
+          const d = driversData.find(x => x.driver_id == val);
+          if(d){
+            form.action = `/drivers/${d.driver_id}/edit`;
+            document.getElementById("drvName").value = d.name || "";
+            document.getElementById("drvDrive").value = d.hourly_drive_wage || "";
+            document.getElementById("drvLoad").value = d.hourly_load_wage || "";
+            if(btnDel) btnDel.style.display = "inline-block";
+          }
+        }
+      });
+    });
+  </script>

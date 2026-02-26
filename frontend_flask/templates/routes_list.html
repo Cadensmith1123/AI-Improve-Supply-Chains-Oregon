@@ -122,18 +122,16 @@
 
 <body>
   <div class="wrap">
+    {% include 'header.html' %}
+
     <div class="topbar">
       <div>
         <h1>Routes</h1>
-        <div class="sub">Assign vehicles, manage load manifests, and track costs.</div>
+        <div class="sub">Manage your distribution routes and manifests.</div>
       </div>
       <div class="actions">
-        <button class="btn primary" data-open="modal-route">+ New Route</button>
-        <button class="btn" data-open="modal-product">+ Add Product</button>
-        <button class="btn" data-open="modal-vehicle">+ Add Vehicle</button>
-        <button class="btn" data-open="modal-location">+ Add Location</button>
-        <a class="btn" href="/products">Products</a>
-        <a class="btn" href="/health">Health</a>
+        <a href="{{ url_for('routes.routes_export_csv') }}" class="btn">Export CSV</a>
+        <button class="btn primary" data-open="modal-route">New Route</button>
       </div>
     </div>
 
@@ -141,11 +139,11 @@
       <table>
         <thead>
           <tr>
+            <th>Date</th>
             <th>route</th>
             <th>start → destination</th>
-            <th>vehicle</th>
             <th>products</th>
-            <th>sales</th>
+            <th>Revenue</th>
             <th>total cost</th>
             <th>actions</th>
           </tr>
@@ -157,12 +155,20 @@
               data-route-id="{{ r.route_id }}"
               data-route-name="{{ r.name if r.name else '' }}"
               data-vehicle-id="{{ r.vehicle_id if r.vehicle_id is not none else '' }}"
-              data-manifest='[
-                {% for item in r.manifest_items %}
-                  {"product_id": {{ item.product_id }}, "product_name": "{{ item.product_name|e }}", "quantity": {{ item.quantity }} }{% if not loop.last %},{% endif %}
-                {% endfor %}
-              ]'
+              data-manifest="{{ r.manifest_items | tojson | forceescape }}"
+              data-origin-id="{{ r.origin_location_id }}"
+              data-dest-id="{{ r.dest_location_id }}"
+              data-entered-revenue="{{ r.entered_revenue }}"
+              data-driver-id="{{ r.driver_id if r.driver_id is not none else '' }}"
+              data-gas-price="{{ r.gas_price }}"
+              data-driver-cost="{{ r.driver_cost }}"
+              data-load-cost="{{ r.load_cost }}"
+              data-unload-cost="{{ r.unload_cost }}"
+              data-insurance-cost="{{ r.insurance_cost }}"
+              data-fuel-cost="{{ r.fuel_cost }}"
+              data-depreciation-cost="{{ r.depreciation_cost }}"
             >
+              <td><div style="font-weight:900; white-space:nowrap;">{{ r.run_date if r.run_date else '—' }}</div></td>
               <td>
                 <div style="font-weight:900;">#{{ r.route_id }}</div>
                 <div class="muted">{{ r.name if r.name else '—' }}</div>
@@ -172,19 +178,6 @@
                 <div style="font-weight:900;">{{ r.origin_name }} → {{ r.dest_name }}</div>
                 <div class="muted">{{ r.origin_address }}</div>
                 <div class="muted">{{ r.dest_address }}</div>
-              </td>
-
-              <td>
-                <div class="stack">
-                  {% if r.vehicle_name %}
-                    <span class="pill">{{ r.vehicle_name }}</span>
-                  {% else %}
-                    <span class="muted">Unassigned</span>
-                  {% endif %}
-                  <div class="row-actions">
-                    <button class="btn small" type="button" data-action="assign-vehicle">Assign</button>
-                  </div>
-                </div>
               </td>
 
               <td>
@@ -205,12 +198,15 @@
                 </div>
               </td>
 
-              <td>${{ "%.2f"|format(r.sales_amount) }}</td>
+              <td>
+                <div>Entered: ${{ "%.2f"|format(r.entered_revenue) }}</div>
+                <div>Items: ${{ "%.2f"|format(r.item_revenue) }}</div>
+              </td>
               <td>${{ "%.2f"|format(r.total_cost) }}</td>
 
               <td>
   <div class="stack">
-    <a class="btn small" href="/routes/{{ r.route_id }}/edit">Edit</a>
+    <button class="btn small" type="button" data-action="edit-route">Edit</button>
     <a class="btn small" href="/routes/{{ r.route_id }}/view">View</a>
   </div>
 </td>
@@ -222,384 +218,25 @@
     </div>
   </div>
 
-  <!-- REUSABLE ASSIGN VEHICLE MODAL -->
-  <div class="modal-backdrop" id="modal-assign-vehicle">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title" id="assignVehicleTitle">Assign Vehicle</div>
-        <button class="x" data-close>&times;</button>
-      </div>
+  {% include 'modal_assign_vehicle.html' %}
 
-      <form method="post" id="assignVehicleForm" action="" novalidate>
-        <div class="modal-body">
-          <div class="field">
-            <label>Vehicle (optional)</label>
-            <select name="vehicle_id" id="assignVehicleSelect">
-              <option value="">-- Unassigned --</option>
-              {% for v in vehicles %}
-                <option value="{{ v.vehicle_id }}">{{ v.vehicle_name }}</option>
-              {% endfor %}
-            </select>
-            <div class="hint">This assigns a vehicle to the selected route.</div>
-          </div>
-        </div>
+  {% include 'modal_manage_load.html' %}
 
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- REUSABLE MANAGE LOAD MODAL -->
-  <div class="modal-backdrop" id="modal-manage-load">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title" id="manageLoadTitle">Manage Load</div>
-        <button class="x" data-close>&times;</button>
-      </div>
-
-      <div class="modal-body">
-        <div style="font-weight:900; margin-bottom: 8px;">Current Manifest</div>
-
-        <div class="manifest-card" style="margin-bottom: 14px;">
-          <table class="manifest-table" style="width:100%; border-collapse:collapse;">
-            <thead>
-              <tr>
-                <th style="text-transform:uppercase; letter-spacing:.05em; font-size:12px; color:#334155;">Product</th>
-                <th style="text-transform:uppercase; letter-spacing:.05em; font-size:12px; color:#334155;">Qty</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="manifestBody"></tbody>
-          </table>
-        </div>
-
-        <div style="font-weight:900; margin: 12px 0 8px;">Add / Update Product</div>
-
-        <form method="post" id="addToLoadForm" action="" novalidate>
-          <div class="grid2">
-            <div class="field">
-              <label>Product</label>
-              <select name="product_id" id="loadProductSelect">
-                <option value="">-- Select --</option>
-                {% for p in products %}
-                  <option value="{{ p.product_id }}">{{ p.product_name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div class="field">
-              <label>Quantity</label>
-              <input name="quantity" id="loadQtyInput" placeholder="e.g., 20">
-            </div>
-          </div>
-
-          <div class="modal-actions" style="padding: 0; border:0; background:transparent; justify-content:flex-end;">
-            <button class="btn primary" type="submit">Save to Manifest</button>
-          </div>
-
-          <div class="hint">If the product is already on the route, this updates its quantity.</div>
-        </form>
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn" type="button" data-close>Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- NEW ROUTE MODAL -->
-  <div class="modal-backdrop" id="modal-route">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Create Route</div>
-        <button class="x" data-close>&times;</button>
-      </div>
-
-      <form method="post" action="/routes/new" novalidate>
-        <div class="modal-body">
-          {% if new_route_errors %}
-            <div class="alert">Fix the highlighted fields and try again.</div>
-          {% endif %}
-
-          <div class="grid2">
-            <div class="field">
-              <label>Route Name (optional)</label>
-              <input name="name" placeholder="e.g., PDX → SEA" value="{{ new_route_form.name }}">
-            </div>
-
-            <div class="field">
-              <label>Sales Amount (required)</label>
-              <input
-                name="sales_amount"
-                placeholder="e.g., 1200.50"
-                value="{{ new_route_form.sales_amount }}"
-                class="{{ 'error-input' if new_route_errors.get('sales_amount') else '' }}"
-              >
-              {% if new_route_errors.get('sales_amount') %}
-                <div class="error-text">{{ new_route_errors.get('sales_amount') }}</div>
-              {% endif %}
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Start Location (required)</label>
-              <select
-                name="origin_location_id"
-                class="{{ 'error-input' if new_route_errors.get('origin_location_id') else '' }}"
-              >
-                <option value="">-- Select --</option>
-                {% for loc in locations %}
-                  <option value="{{ loc.location_id }}"
-                    {% if new_route_form.origin_location_id == (loc.location_id|string) %}selected{% endif %}>
-                    {{ loc.name }}
-                  </option>
-                {% endfor %}
-              </select>
-              {% if new_route_errors.get('origin_location_id') %}
-                <div class="error-text">{{ new_route_errors.get('origin_location_id') }}</div>
-              {% endif %}
-            </div>
-
-            <div class="field">
-              <label>Destination Location (required)</label>
-              <select
-                name="dest_location_id"
-                class="{{ 'error-input' if new_route_errors.get('dest_location_id') else '' }}"
-              >
-                <option value="">-- Select --</option>
-                {% for loc in locations %}
-                  <option value="{{ loc.location_id }}"
-                    {% if new_route_form.dest_location_id == (loc.location_id|string) %}selected{% endif %}>
-                    {{ loc.name }}
-                  </option>
-                {% endfor %}
-              </select>
-              {% if new_route_errors.get('dest_location_id') %}
-                <div class="error-text">{{ new_route_errors.get('dest_location_id') }}</div>
-              {% endif %}
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Origin Address (required)</label>
-            <input
-              name="origin_address"
-              placeholder="Street, City, State ZIP"
-              value="{{ new_route_form.origin_address }}"
-              class="{{ 'error-input' if new_route_errors.get('origin_address') else '' }}"
-            >
-            {% if new_route_errors.get('origin_address') %}
-              <div class="error-text">{{ new_route_errors.get('origin_address') }}</div>
-            {% endif %}
-          </div>
-
-          <div class="field">
-            <label>Destination Address (required)</label>
-            <input
-              name="dest_address"
-              placeholder="Street, City, State ZIP"
-              value="{{ new_route_form.dest_address }}"
-              class="{{ 'error-input' if new_route_errors.get('dest_address') else '' }}"
-            >
-            {% if new_route_errors.get('dest_address') %}
-              <div class="error-text">{{ new_route_errors.get('dest_address') }}</div>
-            {% endif %}
-          </div>
-
-          <div style="font-weight:900; margin: 14px 0 8px;">Vehicle (optional)</div>
-          <div class="field">
-            <label>Assign a vehicle now</label>
-            <select name="vehicle_id" class="{{ 'error-input' if new_route_errors.get('vehicle_id') else '' }}">
-              <option value="">-- Unassigned --</option>
-              {% for v in vehicles %}
-                <option value="{{ v.vehicle_id }}"
-                  {% if new_route_form.vehicle_id == (v.vehicle_id|string) %}selected{% endif %}
-                >{{ v.vehicle_name }}</option>
-              {% endfor %}
-            </select>
-            {% if new_route_errors.get('vehicle_id') %}
-              <div class="error-text">{{ new_route_errors.get('vehicle_id') }}</div>
-            {% endif %}
-          </div>
-
-          <div style="font-weight:900; margin: 14px 0 8px;">Costs (optional)</div>
-          <div class="hint">Leave blank if unknown. If filled, must be numeric.</div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Driver Cost</label>
-              <input name="driver_cost" placeholder="e.g., 120" value="{{ new_route_form.driver_cost }}"
-                     class="{{ 'error-input' if new_route_errors.get('driver_cost') else '' }}">
-              {% if new_route_errors.get('driver_cost') %}<div class="error-text">{{ new_route_errors.get('driver_cost') }}</div>{% endif %}
-            </div>
-
-            <div class="field">
-              <label>Fuel Cost</label>
-              <input name="fuel_cost" placeholder="e.g., 80" value="{{ new_route_form.fuel_cost }}"
-                     class="{{ 'error-input' if new_route_errors.get('fuel_cost') else '' }}">
-              {% if new_route_errors.get('fuel_cost') %}<div class="error-text">{{ new_route_errors.get('fuel_cost') }}</div>{% endif %}
-            </div>
-
-            <div class="field">
-              <label>Load Cost</label>
-              <input name="load_cost" placeholder="e.g., 25" value="{{ new_route_form.load_cost }}"
-                     class="{{ 'error-input' if new_route_errors.get('load_cost') else '' }}">
-              {% if new_route_errors.get('load_cost') %}<div class="error-text">{{ new_route_errors.get('load_cost') }}</div>{% endif %}
-            </div>
-
-            <div class="field">
-              <label>Unload Cost</label>
-              <input name="unload_cost" placeholder="e.g., 25" value="{{ new_route_form.unload_cost }}"
-                     class="{{ 'error-input' if new_route_errors.get('unload_cost') else '' }}">
-              {% if new_route_errors.get('unload_cost') %}<div class="error-text">{{ new_route_errors.get('unload_cost') }}</div>{% endif %}
-            </div>
-
-            <div class="field">
-              <label>Depreciation Cost</label>
-              <input name="depreciation_cost" placeholder="e.g., 15" value="{{ new_route_form.depreciation_cost }}"
-                     class="{{ 'error-input' if new_route_errors.get('depreciation_cost') else '' }}">
-              {% if new_route_errors.get('depreciation_cost') %}<div class="error-text">{{ new_route_errors.get('depreciation_cost') }}</div>{% endif %}
-            </div>
-
-            <div class="field">
-              <label>Insurance Cost</label>
-              <input name="insurance_cost" placeholder="e.g., 10" value="{{ new_route_form.insurance_cost }}"
-                     class="{{ 'error-input' if new_route_errors.get('insurance_cost') else '' }}">
-              {% if new_route_errors.get('insurance_cost') %}<div class="error-text">{{ new_route_errors.get('insurance_cost') }}</div>{% endif %}
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Create Route</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- PRODUCT ENTRY MODAL (UPDATED: NO QUANTITY) -->
-  <div class="modal-backdrop" id="modal-product">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Add Product</div>
-        <button class="x" data-close>&times;</button>
-      </div>
-      <form method="post" action="/products/new">
-        <div class="modal-body">
-          <div class="grid2">
-            <div class="field">
-              <label>Product Name (required)</label>
-              <input name="product_name" required>
-            </div>
-            <div class="field">
-              <label>SKU</label>
-              <input name="sku">
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Category</label>
-              <input name="category" placeholder="e.g., Produce">
-            </div>
-            <div class="field">
-              <label>Unit</label>
-              <input name="unit" placeholder="e.g., cases, lbs">
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Unit Price</label>
-              <input name="unit_price" placeholder="e.g., 28.50">
-              <div class="hint">Price per unit. Quantities are set per route in “Manage load”.</div>
-            </div>
-            <div class="field"></div>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Save Product</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- VEHICLE ENTRY MODAL -->
-  <div class="modal-backdrop" id="modal-vehicle">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Add Vehicle</div>
-        <button class="x" data-close>&times;</button>
-      </div>
-      <form method="post" action="/vehicles/new">
-        <div class="modal-body">
-          <div class="grid2">
-            <div class="field">
-              <label>Vehicle Name / ID (required)</label>
-              <input name="vehicle_name" placeholder="e.g., Truck-12" required>
-            </div>
-            <div class="field">
-              <label>MPG</label>
-              <input name="mpg" placeholder="e.g., 8.5">
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Fuel $/gal</label>
-              <input name="fuel_price" placeholder="e.g., 4.25">
-            </div>
-            <div class="field">
-              <label>Capacity (optional)</label>
-              <input name="capacity" placeholder="e.g., 26 pallets">
-            </div>
-          </div>
-          <div class="hint">Vehicles can be assigned to any route from the table.</div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Save Vehicle</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- LOCATION ENTRY MODAL -->
-  <div class="modal-backdrop" id="modal-location">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Add Location</div>
-        <button class="x" data-close>&times;</button>
-      </div>
-      <form method="post" action="/locations/new">
-        <div class="modal-body">
-          <div class="grid2">
-            <div class="field">
-              <label>Location Name (required)</label>
-              <input name="name" placeholder="e.g., Eugene Warehouse" required>
-            </div>
-            <div class="field">
-              <label>City/State (optional)</label>
-              <input name="region" placeholder="e.g., Eugene, OR">
-            </div>
-          </div>
-          <div class="hint">After saving, it appears in Start/Destination dropdowns.</div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Save Location</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  {% include 'modal_route.html' %}
+  {% include 'modal_product.html' %}
+  {% include 'modal_vehicle.html' %}
+  {% include 'modal_driver.html' %}
+  {% include 'modal_location.html' %}
 
   <script>
+    // Data for Modals
+    const productsData = {{ products | tojson }};
+    const vehiclesData = {{ vehicles | tojson }};
+    const driversData = {{ drivers | tojson }};
+    const locationsData = {{ locations | tojson }};
+    const routesData = {{ routes | tojson }};
+
+    let loadChanged = false;
     const backdrops = document.querySelectorAll(".modal-backdrop");
 
     function openModal(id){
@@ -607,11 +244,30 @@
       if(el){ el.style.display = "flex"; }
     }
     function closeModal(el){
+      if (el.id === "modal-manage-load" && loadChanged) {
+        window.location.reload();
+        return;
+      }
       el.style.display = "none";
     }
 
-    document.querySelectorAll("[data-open]").forEach(b => {
-      b.addEventListener("click", () => openModal(b.dataset.open));
+    document.querySelectorAll("[data-open]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const modalId = btn.dataset.open;
+        if (modalId === "modal-route") {
+            const form = document.querySelector("#modal-route form");
+            form.action = "{{ url_for('routes.route_new_post') }}";
+            form.reset();
+            document.querySelector("#modal-route .modal-title").textContent = "New Route";
+            
+            const sel = document.getElementById("routeSelect");
+            if(sel) {
+              sel.value = "";
+              sel.disabled = false;
+            }
+        }
+        openModal(modalId);
+      });
     });
 
     document.querySelectorAll("[data-close]").forEach(b => {
@@ -626,7 +282,9 @@
     }));
 
     window.addEventListener("keydown", (e) => {
-      if(e.key === "Escape") backdrops.forEach(bd => bd.style.display = "none");
+      if(e.key === "Escape") backdrops.forEach(bd => {
+        if (bd.style.display === "flex") closeModal(bd);
+      });
     });
 
     function parseManifestAttr(tr){
@@ -654,52 +312,199 @@
           <td style="font-weight:900;">${item.product_name}</td>
           <td>${item.quantity}</td>
           <td>
-            <form method="post" action="/routes/${routeId}/load/remove" style="display:inline;">
-              <input type="hidden" name="product_id" value="${item.product_id}">
-              <button class="btn small" type="submit">Remove</button>
-            </form>
+            <button class="btn small remove-item-btn" type="button" 
+              data-route-id="${routeId}" 
+              data-product-id="${item.product_id}">Remove</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    document.querySelectorAll("tbody tr[data-route-id]").forEach(tr => {
-      tr.querySelectorAll("[data-action]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const routeId = tr.getAttribute("data-route-id");
-          const routeName = tr.getAttribute("data-route-name") || "";
-          const vehicleId = tr.getAttribute("data-vehicle-id") || "";
-          const manifest = parseManifestAttr(tr);
+    function updateRowContent(routeId, data) {
+      const tr = document.querySelector(`tr[data-route-id="${routeId}"]`);
+      if(!tr) return;
 
-          if(btn.dataset.action === "assign-vehicle"){
-            document.getElementById("assignVehicleTitle").textContent =
-              routeName ? `Assign Vehicle — Route #${routeId} (${routeName})` : `Assign Vehicle — Route #${routeId}`;
-            const form = document.getElementById("assignVehicleForm");
-            form.action = `/routes/${routeId}/assign-vehicle`;
+      // Update Manifest Data Attribute
+      tr.setAttribute("data-manifest", JSON.stringify(data.manifest));
 
-            const sel = document.getElementById("assignVehicleSelect");
-            sel.value = vehicleId;
-
-            openModal("modal-assign-vehicle");
+      // Update Products Cell (Index 3)
+      const prodCell = tr.cells[3];
+      let prodHtml = `<div class="stack">`;
+      
+      if (data.manifest_count === 0) {
+          prodHtml += `<div class="muted">No products added</div>`;
+      } else {
+          data.manifest.slice(0, 2).forEach(item => {
+              prodHtml += `<div style="font-size:13px;"><strong>${item.product_name}</strong> × ${item.quantity}</div>`;
+          });
+          if (data.manifest_count > 2) {
+              prodHtml += `<div class="mini">+ ${data.manifest_count - 2} more</div>`;
           }
+      }
+      prodHtml += `<div class="row-actions"><button class="btn small" type="button" data-action="manage-load">Manage load</button></div></div>`;
+      prodCell.innerHTML = prodHtml;
+      
+      // Update Sales (Index 4) & Cost (Index 5)
+      tr.cells[4].innerHTML = `<div>Entered: $${data.entered_revenue.toFixed(2)}</div><div>Items: $${data.manifest_subtotal.toFixed(2)}</div>`;
+      tr.cells[5].textContent = '$' + data.total_cost.toFixed(2);
+    }
 
-          if(btn.dataset.action === "manage-load"){
-            document.getElementById("manageLoadTitle").textContent =
-              routeName ? `Manage Load — Route #${routeId} (${routeName})` : `Manage Load — Route #${routeId}`;
+    // Handle "Add to Load" form submission via AJAX
+    const addToLoadForm = document.getElementById("addToLoadForm");
+    addToLoadForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      // Extract routeId from the form action URL
+      const action = addToLoadForm.getAttribute("action");
+      const routeId = action.split("/")[2]; // /routes/123/load/add
+      
+      const formData = new FormData(addToLoadForm);
 
-            renderManifest(routeId, manifest);
-
-            const addForm = document.getElementById("addToLoadForm");
-            addForm.action = `/routes/${routeId}/load/add`;
-
-            document.getElementById("loadProductSelect").value = "";
-            document.getElementById("loadQtyInput").value = "";
-
-            openModal("modal-manage-load");
-          }
+      try {
+        const res = await fetch(action, {
+          method: "POST",
+          body: formData,
+          headers: { "X-Requested-With": "XMLHttpRequest" }
         });
-      });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          loadChanged = true;
+          // Update UI
+          renderManifest(routeId, data.manifest);
+          updateRowContent(routeId, data);
+
+          // Clear inputs
+          document.getElementById("loadProductSelect").value = "";
+          document.getElementById("loadQtyInput").value = "";
+          document.getElementById("loadItemsPerUnitInput").value = "";
+          document.getElementById("loadPriceInput").value = "";
+          document.getElementById("loadCostInput").value = "";
+          document.getElementById("loadWeightInput").value = "";
+          document.getElementById("loadVolumeInput").value = "";
+        } else {
+          alert("Error: " + JSON.stringify(data.errors || data.message));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("An error occurred while updating the load.");
+      }
+    });
+
+    // Handle "Remove" button clicks via AJAX (Delegated event)
+    document.getElementById("manifestBody").addEventListener("click", async (e) => {
+      if (e.target.classList.contains("remove-item-btn")) {
+        const btn = e.target;
+        const routeId = btn.dataset.routeId;
+        const productId = btn.dataset.productId;
+        
+        const formData = new FormData();
+        formData.append("product_id", productId);
+
+        try {
+          const res = await fetch(`/routes/${routeId}/load/remove`, {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          });
+          
+          const data = await res.json();
+          
+          if (data.success) {
+            loadChanged = true;
+            renderManifest(routeId, data.manifest);
+            updateRowContent(routeId, data);
+          } else {
+            alert("Error removing item: " + (data.message || "Unknown error"));
+          }
+        } catch (err) {
+          console.error(err);
+          alert("An error occurred while removing the item.");
+        }
+      }
+    });
+
+    // Event Delegation for Table Actions
+    document.querySelector(".card table tbody").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action]");
+      if(!btn) return;
+      
+      const tr = btn.closest("tr");
+      if(!tr) return;
+      
+      const routeId = tr.getAttribute("data-route-id");
+      const routeName = tr.getAttribute("data-route-name") || "";
+      const vehicleId = tr.getAttribute("data-vehicle-id") || "";
+      const manifest = parseManifestAttr(tr);
+
+      if(btn.dataset.action === "assign-vehicle"){
+        document.getElementById("assignVehicleTitle").textContent =
+          routeName ? `Assign Vehicle — Route #${routeId} (${routeName})` : `Assign Vehicle — Route #${routeId}`;
+        const form = document.getElementById("assignVehicleForm");
+        form.action = `/routes/${routeId}/assign-vehicle`;
+
+        const sel = document.getElementById("assignVehicleSelect");
+        sel.value = vehicleId;
+
+        openModal("modal-assign-vehicle");
+      }
+
+      if(btn.dataset.action === "manage-load"){
+        document.getElementById("manageLoadTitle").textContent =
+          routeName ? `Manage Load — Route #${routeId} (${routeName})` : `Manage Load — Route #${routeId}`;
+
+        loadChanged = false;
+        renderManifest(routeId, manifest);
+
+        const addForm = document.getElementById("addToLoadForm");
+        addForm.action = `/routes/${routeId}/load/add`;
+
+        document.getElementById("loadProductSelect").value = "";
+        document.getElementById("loadQtyInput").value = "";
+        document.getElementById("loadItemsPerUnitInput").value = "";
+        document.getElementById("loadPriceInput").value = "";
+        document.getElementById("loadCostInput").value = "";
+        document.getElementById("loadWeightInput").value = "";
+        document.getElementById("loadVolumeInput").value = "";
+
+        openModal("modal-manage-load");
+      }
+
+      if(btn.dataset.action === "edit-route"){
+        const form = document.querySelector("#modal-route form");
+        form.action = `/routes/${routeId}/edit`;
+        
+        document.querySelector("#modal-route .modal-title").textContent = `Edit Route #${routeId}`;
+        
+        const sel = document.getElementById("routeSelect");
+        if(sel) {
+          sel.value = routeId;
+          sel.disabled = true;
+        }
+
+        const setVal = (name, val) => {
+            const inp = form.querySelector(`[name="${name}"]`);
+            if(inp) inp.value = val;
+        };
+
+        setVal("name", tr.dataset.routeName);
+        setVal("origin_location_id", tr.dataset.originId);
+        setVal("dest_location_id", tr.dataset.destId);
+        setVal("sales_amount", tr.dataset.enteredRevenue);
+        setVal("vehicle_id", tr.dataset.vehicleId);
+        setVal("driver_id", tr.dataset.driverId);
+        setVal("gas_price", tr.dataset.gasPrice);
+        setVal("driver_cost", tr.dataset.driverCost);
+        setVal("load_cost", tr.dataset.loadCost);
+        setVal("unload_cost", tr.dataset.unloadCost);
+        setVal("fuel_cost", tr.dataset.fuelCost);
+        setVal("depreciation_cost", tr.dataset.depreciationCost);
+        setVal("insurance_cost", tr.dataset.insuranceCost);
+        
+        openModal("modal-route");
+      }
     });
 
     {% if open_modal %}

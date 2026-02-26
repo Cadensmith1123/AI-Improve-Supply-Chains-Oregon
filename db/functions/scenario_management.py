@@ -172,6 +172,49 @@ def update_scenario(
             conn.close()
 
 
+def refresh_scenario(tenant_id, scenario_id, conn=None):
+    """
+    Forces a refresh of snapshot values in the scenario header based on current master data.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db()
+        should_close = True
+    
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
+
+    try:
+        # 1. Get current vehicle ID to calculate depreciation
+        scenarios = read.view_scenarios(tenant_id, ids=scenario_id, conn=conn)
+        if not scenarios:
+            return False
+        
+        scenario = scenarios[0]
+        vehicle_id = scenario.get('vehicle_id')
+        
+        depreciation = Decimal("0.000")
+        if vehicle_id:
+            v_rows = read.view_vehicles(tenant_id, ids=vehicle_id, conn=conn)
+            if v_rows:
+                v = v_rows[0]
+                depreciation = calculate_depreciation(
+                    v.get('vehicle_purchase_price'), 
+                    v.get('vehicle_estimated_salvage_value'), 
+                    v.get('vehicle_estimated_yearly_milage')
+                )
+
+        # 2. Call stored procedure
+        cur = conn.cursor()
+        cur.callproc("refresh_trip_snapshots", [tenant_id, scenario_id, depreciation])
+        conn.commit()
+        cur.close()
+        return True
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
 def add_manifest_items(
         tenant_id,
         scenario_id,
@@ -363,6 +406,9 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
     daily_ins = float(header.get("daily_insurance") or 0)
     depreciation_rate = float(header.get("depreciation_per_mile") or 0)
     daily_maintenance_cost = float(header.get("daily_maintenance_cost") or 0)
+    
+    vehicle_mpg = float(header.get("vehicle_mpg") or 0)
+    gas_price = float(header.get("gas_price") or 0)
 
     load_min = float(header.get("plan_load_min") or 0)
     unload_min = float(header.get("plan_unload_min") or 0)
@@ -376,6 +422,12 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
 
     # Asset costs
     depreciation_cost = miles_est * depreciation_rate
+    
+    # Fuel Cost
+    calculated_fuel_cost = 0.0
+    if vehicle_mpg > 0:
+        calculated_fuel_cost = (miles_est / vehicle_mpg) * gas_price
+    final_fuel_cost = calculated_fuel_cost if fuel_cost_est == 0.0 else float(fuel_cost_est)
 
     # Prefer proc totals (more robust), but fall back to summing items
     total_cogs = float(totals.get("total_cogs") or sum(float(x.get("total_line_cogs") or 0) for x in items))
@@ -385,7 +437,7 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
     entered_revenue = float(totals.get("entered_revenue") or header.get("entered_revenue") or 0)
     calculated_revenue = float(totals.get("calculated_revenue") or sum(float(x.get("total_line_revenue") or 0) for x in items))
 
-    total_cost_est = total_cogs + driver_total_cost + daily_ins + daily_maintenance_cost + float(fuel_cost_est) + depreciation_cost
+    total_cost_est = total_cogs + driver_total_cost + daily_ins + daily_maintenance_cost + final_fuel_cost + depreciation_cost
 
     profit_vs_entered = entered_revenue - total_cost_est
     profit_vs_calculated = calculated_revenue - total_cost_est
@@ -407,7 +459,7 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
         "daily_insurance": daily_ins,
         "daily_maintenance_cost": daily_maintenance_cost,
         "depreciation_cost_est": round(depreciation_cost, 2),
-        "fuel_cost_est": round(float(fuel_cost_est), 2),
+        "fuel_cost_est": round(final_fuel_cost, 2),
 
         "driver_drive_cost_est": round(driver_drive_cost, 2),
         "driver_load_cost_est": round(driver_load_cost, 2),
@@ -427,6 +479,7 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
 
         "margin_est_entered": round((profit_vs_entered / entered_revenue) if entered_revenue else 0, 4),
         "margin_est_calculated": round((profit_vs_calculated / calculated_revenue) if calculated_revenue else 0, 4),
+        "total_distance_miles": round(miles_est, 1),
     }
 
 
@@ -479,3 +532,72 @@ def export_trip_csv(trip_details, output_handle):
         finally:
             if should_close:
                 f.close()
+
+
+def export_flattened_csv(trip_details_list, output_handle):
+    """
+    Writes a flattened CSV for a list of trip_details.
+    Each row contains header metrics + line item metrics.
+    """
+    if not trip_details_list:
+        return
+
+    all_rows = []
+    for details in trip_details_list:
+        # Calculate costs/metrics
+        header_metrics = build_trip_costs_row(details)
+        items = details.get("items", [])
+        
+        if not items:
+            all_rows.append(header_metrics)
+        else:
+            for item in items:
+                # Combine header metrics with item metrics
+                row = header_metrics.copy()
+                row.update(item)
+                all_rows.append(row)
+    
+    df = pd.DataFrame(all_rows)
+    
+    should_close = False
+    if isinstance(output_handle, str):
+        f = open(output_handle, "w", newline="", encoding="utf-8")
+        should_close = True
+    else:
+        f = output_handle
+
+    try:
+        df.to_csv(f, index=False)
+    finally:
+        if should_close:
+            f.close()
+
+
+def export_summary_csv(trip_details_list, output_handle):
+    """
+    Writes a summary CSV for a list of trip_details.
+    Each row contains header metrics only (no line items).
+    """
+    if not trip_details_list:
+        return
+
+    all_rows = []
+    for details in trip_details_list:
+        # Calculate costs/metrics
+        header_metrics = build_trip_costs_row(details)
+        all_rows.append(header_metrics)
+    
+    df = pd.DataFrame(all_rows)
+    
+    should_close = False
+    if isinstance(output_handle, str):
+        f = open(output_handle, "w", newline="", encoding="utf-8")
+        should_close = True
+    else:
+        f = output_handle
+
+    try:
+        df.to_csv(f, index=False)
+    finally:
+        if should_close:
+            f.close()
