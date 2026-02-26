@@ -16,7 +16,8 @@ SQL_FILES = [
     "db/procedures/update_trip_header.sql",
     "db/procedures/get_trip_details.sql",
     "db/procedures/get_planning_assets.sql",
-    "db/procedures/generate_test_data.sql"
+    "db/procedures/generate_test_data.sql",
+    "db/procedures/refresh_trip_snapshots.sql"
 ]
 
 def get_db_connection():

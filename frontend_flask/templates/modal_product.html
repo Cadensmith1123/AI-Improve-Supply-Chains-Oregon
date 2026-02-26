@@ -1,0 +1,105 @@
+  <!-- PRODUCT ENTRY MODAL (UPDATED: NO QUANTITY) -->
+  <div class="modal-backdrop" id="modal-product">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Manage Products</div>
+        <button class="x" data-close>&times;</button>
+      </div>
+      <form method="post" action="/products/new" id="productForm">
+        <div class="modal-body">
+          <div class="field">
+            <label>Select Product to Edit</label>
+            <select id="productSelect">
+              <option value="">-- Add New Product --</option>
+              <!-- Populated by JS -->
+            </select>
+          </div>
+          <hr style="border:0; border-top:1px solid #e2e8f0; margin:16px 0;">
+
+          <div class="grid2">
+            <div class="field">
+              <label>Product Name (required)</label>
+              <input name="product_name" id="prodName" required>
+            </div>
+            <div class="field">
+              <label>SKU</label>
+              <input name="sku" id="prodSku">
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Storage Type</label>
+              <select name="storage_type" id="prodStorage">
+                <option value="Dry">Dry</option>
+                <option value="Ref">Refrigerated</option>
+                <option value="Frz">Frozen</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" type="button" id="btnDeleteProduct" style="background-color:#dc2626; color:white; border:0; margin-right:auto; display:none;">Delete</button>
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn primary" type="submit">Save Product</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const sel = document.getElementById("productSelect");
+      if(!sel) return;
+
+      // Populate Dropdown
+      productsData.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.product_code;
+        opt.textContent = `${p.product_name} (${p.product_code})`;
+        sel.appendChild(opt);
+      });
+
+      // Handle Change
+      sel.addEventListener("change", () => {
+        const val = sel.value;
+        const form = document.getElementById("productForm");
+        const btnDel = document.getElementById("btnDeleteProduct");
+        
+        if(!val) {
+          // Add New Mode
+          form.action = "/products/new";
+          document.getElementById("prodName").value = "";
+          document.getElementById("prodSku").value = "";
+          document.getElementById("prodStorage").value = "Dry";
+          if(btnDel) btnDel.style.display = "none";
+        } else {
+          // Edit Mode
+          const p = productsData.find(x => x.product_code == val);
+          if(p){
+            form.action = `/products/${p.product_code}/edit`;
+            document.getElementById("prodName").value = p.product_name || "";
+            document.getElementById("prodSku").value = p.product_code || "";
+            document.getElementById("prodStorage").value = p.storage_type || "Dry";
+            if(btnDel) btnDel.style.display = "inline-block";
+          }
+        }
+      });
+
+      const btnDel = document.getElementById("btnDeleteProduct");
+      if(btnDel){
+        btnDel.addEventListener("click", async () => {
+          const val = document.getElementById("productSelect").value;
+          if(!val) return;
+          if(!confirm("Are you sure you want to delete this product?")) return;
+
+          try {
+            const res = await fetch(`/products/${val}/delete`, { method: "POST" });
+            const data = await res.json();
+            if(data.success) window.location.reload();
+            else alert(data.message);
+          } catch(e) { alert("Error deleting product"); }
+        });
+      }
+    });
+  </script>

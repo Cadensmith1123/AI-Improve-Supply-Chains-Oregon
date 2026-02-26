@@ -91,7 +91,7 @@ CREATE TABLE supply (
     KEY (supply_id),
     FOREIGN KEY (tenant_id, entity_id) REFERENCES entities(tenant_id, entity_id),
     FOREIGN KEY (tenant_id, location_id) REFERENCES locations(tenant_id, location_id),
-    FOREIGN KEY (tenant_id, product_code) REFERENCES products_master(tenant_id, product_code)
+    FOREIGN KEY (tenant_id, product_code) REFERENCES products_master(tenant_id, product_code) ON DELETE CASCADE
 );
 
 -- 7. Demand
@@ -106,7 +106,7 @@ CREATE TABLE demand (
     PRIMARY KEY (tenant_id, demand_id),
     KEY (demand_id),
     FOREIGN KEY (tenant_id, location_id) REFERENCES locations(tenant_id, location_id),
-    FOREIGN KEY (tenant_id, product_code) REFERENCES products_master(tenant_id, product_code)
+    FOREIGN KEY (tenant_id, product_code) REFERENCES products_master(tenant_id, product_code) ON DELETE CASCADE
 );
 
 -- 8. Routes
@@ -175,8 +175,8 @@ CREATE TABLE manifest_items (
     PRIMARY KEY (tenant_id, manifest_item_id),
     KEY (manifest_item_id),
     FOREIGN KEY (tenant_id, scenario_id) REFERENCES scenarios(tenant_id, scenario_id) ON DELETE CASCADE,
-    FOREIGN KEY (tenant_id, supply_id) REFERENCES supply(tenant_id, supply_id),
-    FOREIGN KEY (tenant_id, demand_id) REFERENCES demand(tenant_id, demand_id)
+    FOREIGN KEY (supply_id) REFERENCES supply(supply_id) ON DELETE SET NULL,
+    FOREIGN KEY (demand_id) REFERENCES demand(demand_id) ON DELETE SET NULL
 );
 
 -- 11. Triggers for Inventory Management

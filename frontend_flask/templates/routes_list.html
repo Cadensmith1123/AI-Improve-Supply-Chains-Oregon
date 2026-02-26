@@ -27,7 +27,6 @@
       padding: 10px 12px; border-radius: 12px; cursor:pointer; font-weight:700;
       box-shadow: 0 1px 0 rgba(2,6,23,.03);
       display:inline-block;
-      text-decoration:none;
     }
     .btn.primary{ background: var(--brand); color: #fff; border-color: transparent; }
     .btn.small{ padding: 7px 10px; border-radius: 10px; font-size: 12px; }
@@ -46,7 +45,18 @@
     th, td { border-bottom: 1px solid var(--border); padding: 12px 12px; text-align: left; vertical-align: top; }
     th { background: #f8fafc; font-size: 12px; color: #334155; text-transform: uppercase; letter-spacing:.05em; }
     td { font-size: 14px; }
+    a { color: var(--brand); text-decoration: none; font-weight: 700; }
+    a:hover { text-decoration: underline; }
+
+    .pill{
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid var(--border); padding: 6px 10px; border-radius: 999px;
+      background:#fff;
+      font-weight:800; font-size: 12px; color:#0f172a;
+    }
     .muted{ color: var(--muted); font-size: 12px; font-weight: 700; }
+    .mini{ font-size:12px; color: var(--muted); font-weight: 800; }
+
     .stack{ display:flex; flex-direction:column; gap:6px; }
     .row-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 8px; }
 
@@ -89,22 +99,39 @@
       display:flex; justify-content:flex-end; gap:10px;
       padding: 14px 16px; border-top: 1px solid var(--border); background:#fbfdff;
     }
+    .error-input{ border-color: var(--danger); background:#fff5f5; }
+    .error-text{ color: var(--danger); font-size: 12px; margin-top: 6px; font-weight: 800; }
+    .alert{
+      background:#fee2e2; color: var(--danger);
+      padding: 10px; border-radius: 12px; margin-bottom: 12px;
+      border: 1px solid rgba(185,28,28,.25);
+      font-weight: 900;
+    }
+
+    .manifest-card{
+      border:1px solid var(--border);
+      border-radius: 12px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .manifest-table th{ background:#f8fafc; }
+    .manifest-table th, .manifest-table td{ padding: 10px; border-bottom:1px solid var(--border); }
+    .manifest-table td:last-child{ text-align:right; }
   </style>
 </head>
 
 <body>
   <div class="wrap">
+    {% include 'header.html' %}
+
     <div class="topbar">
       <div>
         <h1>Routes</h1>
-        <div class="sub">Routes define origin + destination. Run-specific details belong to scenarios.</div>
+        <div class="sub">Manage your distribution routes and manifests.</div>
       </div>
       <div class="actions">
-        <button class="btn primary" data-open="modal-route">+ New Route</button>
-        <button class="btn" data-open="modal-product">+ New Product Type</button>
-        <button class="btn" data-open="modal-vehicle">+ New Vehicle</button>
-        <button class="btn" data-open="modal-location">+ New Location</button>
-        <a class="btn" href="/products">Product Types</a>
+        <a href="{{ url_for('routes.routes_export_csv') }}" class="btn">Export CSV</a>
+        <button class="btn primary" data-open="modal-route">New Route</button>
       </div>
     </div>
 
@@ -112,37 +139,77 @@
       <table>
         <thead>
           <tr>
+            <th>Date</th>
             <th>route</th>
-            <th>origin</th>
-            <th>destination</th>
+            <th>start → destination</th>
+            <th>products</th>
+            <th>Revenue</th>
+            <th>total cost</th>
             <th>actions</th>
           </tr>
         </thead>
 
         <tbody>
           {% for r in routes %}
-            <tr>
+            <tr
+              data-route-id="{{ r.route_id }}"
+              data-route-name="{{ r.name if r.name else '' }}"
+              data-vehicle-id="{{ r.vehicle_id if r.vehicle_id is not none else '' }}"
+              data-manifest="{{ r.manifest_items | tojson | forceescape }}"
+              data-origin-id="{{ r.origin_location_id }}"
+              data-dest-id="{{ r.dest_location_id }}"
+              data-entered-revenue="{{ r.entered_revenue }}"
+              data-driver-id="{{ r.driver_id if r.driver_id is not none else '' }}"
+              data-gas-price="{{ r.gas_price }}"
+              data-driver-cost="{{ r.driver_cost }}"
+              data-load-cost="{{ r.load_cost }}"
+              data-unload-cost="{{ r.unload_cost }}"
+              data-insurance-cost="{{ r.insurance_cost }}"
+              data-fuel-cost="{{ r.fuel_cost }}"
+              data-depreciation-cost="{{ r.depreciation_cost }}"
+            >
+              <td><div style="font-weight:900; white-space:nowrap;">{{ r.run_date if r.run_date else '—' }}</div></td>
               <td>
                 <div style="font-weight:900;">#{{ r.route_id }}</div>
                 <div class="muted">{{ r.name if r.name else '—' }}</div>
               </td>
 
               <td>
-                <div style="font-weight:900;">{{ r.origin_name }}</div>
-                <div class="muted">{{ r.origin_address_street }}, {{ r.origin_city }}, {{ r.origin_state }} {{ r.origin_zip_code }}</div>
-              </td>
-
-              <td>
-                <div style="font-weight:900;">{{ r.dest_name }}</div>
-                <div class="muted">{{ r.dest_address_street }}, {{ r.dest_city }}, {{ r.dest_state }} {{ r.dest_zip_code }}</div>
+                <div style="font-weight:900;">{{ r.origin_name }} → {{ r.dest_name }}</div>
+                <div class="muted">{{ r.origin_address }}</div>
+                <div class="muted">{{ r.dest_address }}</div>
               </td>
 
               <td>
                 <div class="stack">
-                  <a class="btn small" href="/routes/{{ r.route_id }}/edit">Edit</a>
-                  <a class="btn small" href="/routes/{{ r.route_id }}/view">View</a>
+                  {% if r.manifest_count == 0 %}
+                    <div class="muted">No products added</div>
+                  {% else %}
+                    {% for item in r.manifest_items[:2] %}
+                      <div style="font-size:13px;"><strong>{{ item.product_name }}</strong> × {{ item.quantity }}</div>
+                    {% endfor %}
+                    {% if r.manifest_count > 2 %}
+                      <div class="mini">+ {{ r.manifest_count - 2 }} more</div>
+                    {% endif %}
+                  {% endif %}
+                  <div class="row-actions">
+                    <button class="btn small" type="button" data-action="manage-load">Manage load</button>
+                  </div>
                 </div>
               </td>
+
+              <td>
+                <div>Entered: ${{ "%.2f"|format(r.entered_revenue) }}</div>
+                <div>Items: ${{ "%.2f"|format(r.item_revenue) }}</div>
+              </td>
+              <td>${{ "%.2f"|format(r.total_cost) }}</td>
+
+              <td>
+  <div class="stack">
+    <button class="btn small" type="button" data-action="edit-route">Edit</button>
+    <a class="btn small" href="/routes/{{ r.route_id }}/view">View</a>
+  </div>
+</td>
 
             </tr>
           {% endfor %}
@@ -151,246 +218,25 @@
     </div>
   </div>
 
-  <!-- NEW ROUTE MODAL (SYNCED to routes table) -->
-  <div class="modal-backdrop" id="modal-route">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Create Route</div>
-        <button class="x" data-close>&times;</button>
-      </div>
+  {% include 'modal_assign_vehicle.html' %}
 
-      <form method="post" action="/routes/new" novalidate>
-        <div class="modal-body">
-          <div class="grid2">
-            <div class="field">
-              <label>Route Name (optional)</label>
-              <input name="name" placeholder="e.g., PDX → SEA">
-            </div>
-            <div class="field">
-              <label>Origin (required)</label>
-              <select name="origin_location_id" required>
-                <option value="">-- Select --</option>
-                {% for loc in locations %}
-                  <option value="{{ loc.location_id }}">{{ loc.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
+  {% include 'modal_manage_load.html' %}
 
-          <div class="field">
-            <label>Destination (required)</label>
-            <select name="dest_location_id" required>
-              <option value="">-- Select --</option>
-              {% for loc in locations %}
-                <option value="{{ loc.location_id }}">{{ loc.name }}</option>
-              {% endfor %}
-            </select>
-          </div>
-
-          <div class="hint">Routes only store origin + destination. Run info goes into scenarios.</div>
-        </div>
-
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Create Route</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- PRODUCT TYPE MODAL (SYNCED to products_master) -->
-  <div class="modal-backdrop" id="modal-product">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Add Product Type</div>
-        <button class="x" data-close>&times;</button>
-      </div>
-      <form method="post" action="/products/new" novalidate>
-        <div class="modal-body">
-          <div class="grid2">
-            <div class="field">
-              <label>Product Code (required)</label>
-              <input name="product_code" placeholder="e.g., APL-001" required>
-            </div>
-            <div class="field">
-              <label>Name (required)</label>
-              <input name="name" placeholder="e.g., Apples" required>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Storage Type (required)</label>
-            <select name="storage_type" required>
-              <option value="">-- Select --</option>
-              <option value="Dry">Dry</option>
-              <option value="Ref">Ref</option>
-              <option value="Frz">Frz</option>
-            </select>
-          </div>
-
-          <div class="hint">Matches products_master: product_code, name, storage_type.</div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Save Product Type</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- VEHICLE MODAL (SYNCED to vehicles) -->
-  <div class="modal-backdrop" id="modal-vehicle">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Add Vehicle</div>
-        <button class="x" data-close>&times;</button>
-      </div>
-      <form method="post" action="/vehicles/new" novalidate>
-        <div class="modal-body">
-          <div class="grid2">
-            <div class="field">
-              <label>Name (required)</label>
-              <input name="name" placeholder="e.g., Truck-12" required>
-            </div>
-            <div class="field">
-              <label>MPG (required)</label>
-              <input name="mpg" placeholder="e.g., 8.5" required>
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Max Weight (lbs) (required)</label>
-              <input name="max_weight_lbs" placeholder="e.g., 25000" required>
-            </div>
-            <div class="field">
-              <label>Max Volume (cubic ft) (required)</label>
-              <input name="max_volume_cubic_ft" placeholder="e.g., 1800" required>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Storage Type (required)</label>
-            <select name="storage_type" required>
-              <option value="">-- Select --</option>
-              <option value="Dry">Dry</option>
-              <option value="Ref">Ref</option>
-              <option value="Frz">Frz</option>
-              <option value="Multi">Multi</option>
-            </select>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Depreciation per mile (optional)</label>
-              <input name="depreciation_per_mile" placeholder="e.g., 0.125">
-            </div>
-            <div class="field">
-              <label>Annual insurance cost (optional)</label>
-              <input name="annual_insurance_cost" placeholder="e.g., 2500.00">
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Annual maintenance cost (optional)</label>
-            <input name="annual_maintenance_cost" placeholder="e.g., 1800.00">
-          </div>
-
-          <div class="hint">Matches vehicles table fields.</div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Save Vehicle</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- LOCATION MODAL (SYNCED to locations + add_location example) -->
-  <div class="modal-backdrop" id="modal-location">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Add Location</div>
-        <button class="x" data-close>&times;</button>
-      </div>
-      <form method="post" action="/locations/new" novalidate>
-        <div class="modal-body">
-          <div class="grid2">
-            <div class="field">
-              <label>Name (required)</label>
-              <input name="name" placeholder="e.g., Eugene Warehouse" required>
-            </div>
-            <div class="field">
-              <label>Type (required)</label>
-              <select name="type" required>
-                <option value="">-- Select --</option>
-                <option value="Hub">Hub</option>
-                <option value="Store">Store</option>
-                <option value="Farm">Farm</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Street Address</label>
-            <input name="address_street" placeholder="e.g., 123 Main St">
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>City</label>
-              <input name="city" placeholder="e.g., Portland">
-            </div>
-            <div class="field">
-              <label>State</label>
-              <input name="state" placeholder="e.g., OR">
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>ZIP</label>
-              <input name="zip_code" placeholder="e.g., 97000">
-            </div>
-            <div class="field">
-              <label>Phone</label>
-              <input name="phone" placeholder="e.g., 555-1212">
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Latitude (optional)</label>
-              <input name="latitude" placeholder="e.g., 45.512794">
-            </div>
-            <div class="field">
-              <label>Longitude (optional)</label>
-              <input name="longitude" placeholder="e.g., -122.679565">
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Avg Load Minutes</label>
-              <input name="avg_load_minutes" placeholder="e.g., 30">
-            </div>
-            <div class="field">
-              <label>Avg Unload Minutes</label>
-              <input name="avg_unload_minutes" placeholder="e.g., 30">
-            </div>
-          </div>
-
-          <div class="hint">Matches locations table + add_location(...) signature (tenant_id handled server-side).</div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn" type="button" data-close>Cancel</button>
-          <button class="btn primary" type="submit">Save Location</button>
-        </div>
-      </form>
-    </div>
-  </div>
+  {% include 'modal_route.html' %}
+  {% include 'modal_product.html' %}
+  {% include 'modal_vehicle.html' %}
+  {% include 'modal_driver.html' %}
+  {% include 'modal_location.html' %}
 
   <script>
+    // Data for Modals
+    const productsData = {{ products | tojson }};
+    const vehiclesData = {{ vehicles | tojson }};
+    const driversData = {{ drivers | tojson }};
+    const locationsData = {{ locations | tojson }};
+    const routesData = {{ routes | tojson }};
+
+    let loadChanged = false;
     const backdrops = document.querySelectorAll(".modal-backdrop");
 
     function openModal(id){
@@ -398,11 +244,30 @@
       if(el){ el.style.display = "flex"; }
     }
     function closeModal(el){
+      if (el.id === "modal-manage-load" && loadChanged) {
+        window.location.reload();
+        return;
+      }
       el.style.display = "none";
     }
 
-    document.querySelectorAll("[data-open]").forEach(b => {
-      b.addEventListener("click", () => openModal(b.dataset.open));
+    document.querySelectorAll("[data-open]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const modalId = btn.dataset.open;
+        if (modalId === "modal-route") {
+            const form = document.querySelector("#modal-route form");
+            form.action = "{{ url_for('routes.route_new_post') }}";
+            form.reset();
+            document.querySelector("#modal-route .modal-title").textContent = "New Route";
+            
+            const sel = document.getElementById("routeSelect");
+            if(sel) {
+              sel.value = "";
+              sel.disabled = false;
+            }
+        }
+        openModal(modalId);
+      });
     });
 
     document.querySelectorAll("[data-close]").forEach(b => {
@@ -417,7 +282,229 @@
     }));
 
     window.addEventListener("keydown", (e) => {
-      if(e.key === "Escape") backdrops.forEach(bd => bd.style.display = "none");
+      if(e.key === "Escape") backdrops.forEach(bd => {
+        if (bd.style.display === "flex") closeModal(bd);
+      });
+    });
+
+    function parseManifestAttr(tr){
+      try {
+        return JSON.parse(tr.getAttribute("data-manifest") || "[]");
+      } catch {
+        return [];
+      }
+    }
+
+    function renderManifest(routeId, manifest){
+      const tbody = document.getElementById("manifestBody");
+      tbody.innerHTML = "";
+
+      if(!manifest.length){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td class="muted" colspan="3" style="padding:12px;">No products on this route yet.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      manifest.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td style="font-weight:900;">${item.product_name}</td>
+          <td>${item.quantity}</td>
+          <td>
+            <button class="btn small remove-item-btn" type="button" 
+              data-route-id="${routeId}" 
+              data-product-id="${item.product_id}">Remove</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateRowContent(routeId, data) {
+      const tr = document.querySelector(`tr[data-route-id="${routeId}"]`);
+      if(!tr) return;
+
+      // Update Manifest Data Attribute
+      tr.setAttribute("data-manifest", JSON.stringify(data.manifest));
+
+      // Update Products Cell (Index 3)
+      const prodCell = tr.cells[3];
+      let prodHtml = `<div class="stack">`;
+      
+      if (data.manifest_count === 0) {
+          prodHtml += `<div class="muted">No products added</div>`;
+      } else {
+          data.manifest.slice(0, 2).forEach(item => {
+              prodHtml += `<div style="font-size:13px;"><strong>${item.product_name}</strong> × ${item.quantity}</div>`;
+          });
+          if (data.manifest_count > 2) {
+              prodHtml += `<div class="mini">+ ${data.manifest_count - 2} more</div>`;
+          }
+      }
+      prodHtml += `<div class="row-actions"><button class="btn small" type="button" data-action="manage-load">Manage load</button></div></div>`;
+      prodCell.innerHTML = prodHtml;
+      
+      // Update Sales (Index 4) & Cost (Index 5)
+      tr.cells[4].innerHTML = `<div>Entered: $${data.entered_revenue.toFixed(2)}</div><div>Items: $${data.manifest_subtotal.toFixed(2)}</div>`;
+      tr.cells[5].textContent = '$' + data.total_cost.toFixed(2);
+    }
+
+    // Handle "Add to Load" form submission via AJAX
+    const addToLoadForm = document.getElementById("addToLoadForm");
+    addToLoadForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      // Extract routeId from the form action URL
+      const action = addToLoadForm.getAttribute("action");
+      const routeId = action.split("/")[2]; // /routes/123/load/add
+      
+      const formData = new FormData(addToLoadForm);
+
+      try {
+        const res = await fetch(action, {
+          method: "POST",
+          body: formData,
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          loadChanged = true;
+          // Update UI
+          renderManifest(routeId, data.manifest);
+          updateRowContent(routeId, data);
+
+          // Clear inputs
+          document.getElementById("loadProductSelect").value = "";
+          document.getElementById("loadQtyInput").value = "";
+          document.getElementById("loadItemsPerUnitInput").value = "";
+          document.getElementById("loadPriceInput").value = "";
+          document.getElementById("loadCostInput").value = "";
+          document.getElementById("loadWeightInput").value = "";
+          document.getElementById("loadVolumeInput").value = "";
+        } else {
+          alert("Error: " + JSON.stringify(data.errors || data.message));
+        }
+      } catch (err) {
+        console.error(err);
+        alert("An error occurred while updating the load.");
+      }
+    });
+
+    // Handle "Remove" button clicks via AJAX (Delegated event)
+    document.getElementById("manifestBody").addEventListener("click", async (e) => {
+      if (e.target.classList.contains("remove-item-btn")) {
+        const btn = e.target;
+        const routeId = btn.dataset.routeId;
+        const productId = btn.dataset.productId;
+        
+        const formData = new FormData();
+        formData.append("product_id", productId);
+
+        try {
+          const res = await fetch(`/routes/${routeId}/load/remove`, {
+            method: "POST",
+            body: formData,
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          });
+          
+          const data = await res.json();
+          
+          if (data.success) {
+            loadChanged = true;
+            renderManifest(routeId, data.manifest);
+            updateRowContent(routeId, data);
+          } else {
+            alert("Error removing item: " + (data.message || "Unknown error"));
+          }
+        } catch (err) {
+          console.error(err);
+          alert("An error occurred while removing the item.");
+        }
+      }
+    });
+
+    // Event Delegation for Table Actions
+    document.querySelector(".card table tbody").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action]");
+      if(!btn) return;
+      
+      const tr = btn.closest("tr");
+      if(!tr) return;
+      
+      const routeId = tr.getAttribute("data-route-id");
+      const routeName = tr.getAttribute("data-route-name") || "";
+      const vehicleId = tr.getAttribute("data-vehicle-id") || "";
+      const manifest = parseManifestAttr(tr);
+
+      if(btn.dataset.action === "assign-vehicle"){
+        document.getElementById("assignVehicleTitle").textContent =
+          routeName ? `Assign Vehicle — Route #${routeId} (${routeName})` : `Assign Vehicle — Route #${routeId}`;
+        const form = document.getElementById("assignVehicleForm");
+        form.action = `/routes/${routeId}/assign-vehicle`;
+
+        const sel = document.getElementById("assignVehicleSelect");
+        sel.value = vehicleId;
+
+        openModal("modal-assign-vehicle");
+      }
+
+      if(btn.dataset.action === "manage-load"){
+        document.getElementById("manageLoadTitle").textContent =
+          routeName ? `Manage Load — Route #${routeId} (${routeName})` : `Manage Load — Route #${routeId}`;
+
+        loadChanged = false;
+        renderManifest(routeId, manifest);
+
+        const addForm = document.getElementById("addToLoadForm");
+        addForm.action = `/routes/${routeId}/load/add`;
+
+        document.getElementById("loadProductSelect").value = "";
+        document.getElementById("loadQtyInput").value = "";
+        document.getElementById("loadItemsPerUnitInput").value = "";
+        document.getElementById("loadPriceInput").value = "";
+        document.getElementById("loadCostInput").value = "";
+        document.getElementById("loadWeightInput").value = "";
+        document.getElementById("loadVolumeInput").value = "";
+
+        openModal("modal-manage-load");
+      }
+
+      if(btn.dataset.action === "edit-route"){
+        const form = document.querySelector("#modal-route form");
+        form.action = `/routes/${routeId}/edit`;
+        
+        document.querySelector("#modal-route .modal-title").textContent = `Edit Route #${routeId}`;
+        
+        const sel = document.getElementById("routeSelect");
+        if(sel) {
+          sel.value = routeId;
+          sel.disabled = true;
+        }
+
+        const setVal = (name, val) => {
+            const inp = form.querySelector(`[name="${name}"]`);
+            if(inp) inp.value = val;
+        };
+
+        setVal("name", tr.dataset.routeName);
+        setVal("origin_location_id", tr.dataset.originId);
+        setVal("dest_location_id", tr.dataset.destId);
+        setVal("sales_amount", tr.dataset.enteredRevenue);
+        setVal("vehicle_id", tr.dataset.vehicleId);
+        setVal("driver_id", tr.dataset.driverId);
+        setVal("gas_price", tr.dataset.gasPrice);
+        setVal("driver_cost", tr.dataset.driverCost);
+        setVal("load_cost", tr.dataset.loadCost);
+        setVal("unload_cost", tr.dataset.unloadCost);
+        setVal("fuel_cost", tr.dataset.fuelCost);
+        setVal("depreciation_cost", tr.dataset.depreciationCost);
+        setVal("insurance_cost", tr.dataset.insuranceCost);
+        
+        openModal("modal-route");
+      }
     });
 
     {% if open_modal %}

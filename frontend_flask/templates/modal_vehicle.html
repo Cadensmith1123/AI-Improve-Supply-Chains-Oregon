@@ -1,0 +1,150 @@
+  <!-- VEHICLE ENTRY MODAL -->
+  <div class="modal-backdrop" id="modal-vehicle">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Manage Vehicles</div>
+        <button class="x" data-close>&times;</button>
+      </div>
+      <form method="post" action="/vehicles/new" id="vehicleForm">
+        <div class="modal-body">
+          <div class="field">
+            <label>Select Vehicle to Edit</label>
+            <select id="vehicleSelect">
+              <option value="">-- Add New Vehicle --</option>
+              <!-- Populated by JS -->
+            </select>
+          </div>
+          <hr style="border:0; border-top:1px solid #e2e8f0; margin:16px 0;">
+
+          <div class="grid2">
+            <div class="field">
+              <label>Vehicle Name / ID (required)</label>
+              <input name="vehicle_name" id="vehName" placeholder="e.g., Truck-12" required>
+            </div>
+            <div class="field">
+              <label>Capacity (lbs)</label>
+              <input name="capacity" id="vehCap" placeholder="e.g., 26000">
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>MPG</label>
+              <input name="mpg" id="vehMpg" placeholder="e.g., 8.5">
+            </div>
+            <div class="field">
+              <label>Est. Yearly Miles</label>
+              <input name="yearly_mileage" id="vehMiles" placeholder="e.g., 20000">
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Purchase Price ($)</label>
+              <input name="purchase_price" id="vehPrice" placeholder="e.g., 45000">
+            </div>
+            <div class="field">
+              <label>Salvage Value ($)</label>
+              <input name="salvage_value" id="vehSalvage" placeholder="e.g., 5000">
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Annual Insurance ($)</label>
+              <input name="insurance_cost" id="vehIns" placeholder="e.g., 1200">
+            </div>
+            <div class="field">
+              <label>Annual Maintenance ($)</label>
+              <input name="maintenance_cost" id="vehMaint" placeholder="e.g., 800">
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Storage Type</label>
+            <select name="storage_type" id="vehStorage">
+              <option value="Dry">Dry</option>
+              <option value="Ref">Refrigerated</option>
+              <option value="Frz">Frozen</option>
+              <option value="Multi">Multi-Temp</option>
+            </select>
+          </div>
+          <div class="hint">Vehicles can be assigned to any route from the table.</div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" type="button" id="btnDeleteVehicle" style="background-color:#dc2626; color:white; border:0; margin-right:auto; display:none;">Delete</button>
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn primary" type="submit">Save Vehicle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const sel = document.getElementById("vehicleSelect");
+      if(!sel) return;
+
+      // Populate
+      vehiclesData.forEach(v => {
+        const opt = document.createElement("option");
+        opt.value = v.vehicle_id;
+        opt.textContent = v.vehicle_name;
+        sel.appendChild(opt);
+      });
+
+      // Handle Change
+      sel.addEventListener("change", () => {
+        const val = sel.value;
+        const form = document.getElementById("vehicleForm");
+        const btnDel = document.getElementById("btnDeleteVehicle");
+        
+        if(!val) {
+          // Add New
+          form.action = "/vehicles/new";
+          document.getElementById("vehName").value = "";
+          document.getElementById("vehMpg").value = "";
+          document.getElementById("vehCap").value = "";
+          document.getElementById("vehMiles").value = "";
+          document.getElementById("vehPrice").value = "";
+          document.getElementById("vehSalvage").value = "";
+          document.getElementById("vehIns").value = "";
+          document.getElementById("vehMaint").value = "";
+          document.getElementById("vehStorage").value = "Dry";
+          if(btnDel) btnDel.style.display = "none";
+        } else {
+          // Edit
+          const v = vehiclesData.find(x => x.vehicle_id == val);
+          if(v){
+            form.action = `/vehicles/${v.vehicle_id}/edit`;
+            document.getElementById("vehName").value = v.vehicle_name || "";
+            document.getElementById("vehMpg").value = v.mpg || "";
+            document.getElementById("vehCap").value = v.max_weight_lbs || ""; // Assuming capacity maps to weight for now
+            document.getElementById("vehMiles").value = v.vehicle_estimated_yearly_milage || "";
+            document.getElementById("vehPrice").value = v.vehicle_purchase_price || "";
+            document.getElementById("vehSalvage").value = v.vehicle_estimated_salvage_value || "";
+            document.getElementById("vehIns").value = v.annual_insurance_cost || "";
+            document.getElementById("vehMaint").value = v.annual_maintenance_cost || "";
+            document.getElementById("vehStorage").value = v.storage_type || "Dry";
+          }
+          if(btnDel) btnDel.style.display = "inline-block";
+        }
+      });
+
+      const btnDel = document.getElementById("btnDeleteVehicle");
+      if(btnDel){
+        btnDel.addEventListener("click", async () => {
+          const val = document.getElementById("vehicleSelect").value;
+          if(!val) return;
+          if(!confirm("Are you sure you want to delete this vehicle?")) return;
+
+          try {
+            const res = await fetch(`/vehicles/${val}/delete`, { method: "POST" });
+            const data = await res.json();
+            if(data.success) window.location.reload();
+            else alert(data.message);
+          } catch(e) { alert("Error deleting vehicle"); }
+        });
+      }
+    });
+  </script>

@@ -1,0 +1,201 @@
+  <!-- NEW ROUTE MODAL -->
+  <div class="modal-backdrop" id="modal-route">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Manage Routes</div>
+        <button class="x" data-close>&times;</button>
+      </div>
+
+      <form method="post" action="/routes/new" id="routeForm" novalidate>
+        <div class="modal-body">
+          <div class="field">
+            <label>Select Route to Edit</label>
+            <select id="routeSelect">
+              <option value="">-- Create New Route --</option>
+              <!-- Populated by JS -->
+            </select>
+          </div>
+          <hr style="border:0; border-top:1px solid #e2e8f0; margin:16px 0;">
+
+          {% if new_route_errors %}
+            <div class="alert">Fix the highlighted fields and try again.</div>
+          {% endif %}
+
+          <div class="field">
+            <label>Route Name (optional)</label>
+            <input name="name" id="rtName" placeholder="e.g., PDX → SEA" value="{{ new_route_form.name }}">
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Sales Amount (required)</label>
+              <input
+                name="sales_amount"
+                id="rtSales"
+                placeholder="e.g., 1200.50"
+                value="{{ new_route_form.sales_amount }}"
+                class="{{ 'error-input' if new_route_errors.get('sales_amount') else '' }}"
+              >
+              {% if new_route_errors.get('sales_amount') %}
+                <div class="error-text">{{ new_route_errors.get('sales_amount') }}</div>
+              {% endif %}
+            </div>
+
+            <div class="field">
+              <label>Gas Price ($/gal)</label>
+              <input
+                name="gas_price"
+                id="rtGas"
+                placeholder="e.g., 4.50"
+                value="{{ new_route_form.gas_price }}"
+                class="{{ 'error-input' if new_route_errors.get('gas_price') else '' }}"
+              >
+              {% if new_route_errors.get('gas_price') %}
+                <div class="error-text">{{ new_route_errors.get('gas_price') }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Start Location (required)</label>
+              <select
+                name="origin_location_id"
+                id="rtOrigin"
+                class="{{ 'error-input' if new_route_errors.get('origin_location_id') else '' }}"
+              >
+                <option value="">-- Select --</option>
+                {% for loc in locations %}
+                  <option value="{{ loc.location_id }}"
+                    {% if new_route_form.origin_location_id == (loc.location_id|string) %}selected{% endif %}>
+                    {{ loc.name }}
+                  </option>
+                {% endfor %}
+              </select>
+              {% if new_route_errors.get('origin_location_id') %}
+                <div class="error-text">{{ new_route_errors.get('origin_location_id') }}</div>
+              {% endif %}
+            </div>
+
+            <div class="field">
+              <label>Destination Location (required)</label>
+              <select
+                name="dest_location_id"
+                id="rtDest"
+                class="{{ 'error-input' if new_route_errors.get('dest_location_id') else '' }}"
+              >
+                <option value="">-- Select --</option>
+                {% for loc in locations %}
+                  <option value="{{ loc.location_id }}"
+                    {% if new_route_form.dest_location_id == (loc.location_id|string) %}selected{% endif %}>
+                    {{ loc.name }}
+                  </option>
+                {% endfor %}
+              </select>
+              {% if new_route_errors.get('dest_location_id') %}
+                <div class="error-text">{{ new_route_errors.get('dest_location_id') }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div style="font-weight:900; margin: 14px 0 8px;">Resources (optional)</div>
+          <div class="grid2">
+            <div class="field">
+              <label>Vehicle</label>
+              <select name="vehicle_id" id="rtVehicle" class="{{ 'error-input' if new_route_errors.get('vehicle_id') else '' }}">
+                <option value="">-- Unassigned --</option>
+                {% for v in vehicles %}
+                  <option value="{{ v.vehicle_id }}"
+                    {% if new_route_form.vehicle_id == (v.vehicle_id|string) %}selected{% endif %}
+                  >{{ v.vehicle_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Driver</label>
+              <select name="driver_id" id="rtDriver" class="{{ 'error-input' if new_route_errors.get('driver_id') else '' }}">
+                <option value="">-- Unassigned --</option>
+                {% for d in drivers %}
+                  <option value="{{ d.driver_id }}"
+                    {% if new_route_form.driver_id == (d.driver_id|string) %}selected{% endif %}
+                  >{{ d.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn" type="button" id="btnDeleteRoute" style="background-color:#dc2626; color:white; border:0; margin-right:auto; display:none;">Delete</button>
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn primary" type="submit">Create Route</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const sel = document.getElementById("routeSelect");
+      if(!sel) return;
+
+      // Populate
+      routesData.forEach(r => {
+        const opt = document.createElement("option");
+        opt.value = r.route_id;
+        opt.textContent = `Route #${r.route_id} - ${r.name || 'Unnamed'}`;
+        sel.appendChild(opt);
+      });
+
+      // Handle Change
+      sel.addEventListener("change", () => {
+        const val = sel.value;
+        const form = document.getElementById("routeForm");
+        const btnDel = document.getElementById("btnDeleteRoute");
+        
+        if(!val) {
+          // Add New
+          form.action = "/routes/new";
+          document.getElementById("rtName").value = "";
+          document.getElementById("rtSales").value = "";
+          document.getElementById("rtGas").value = "";
+          document.getElementById("rtOrigin").value = "";
+          document.getElementById("rtDest").value = "";
+          document.getElementById("rtVehicle").value = "";
+          document.getElementById("rtDriver").value = "";
+          if(btnDel) btnDel.style.display = "none";
+        } else {
+          // Edit
+          const r = routesData.find(x => x.route_id == val);
+          if(r){
+            form.action = `/routes/${r.route_id}/edit`;
+            document.getElementById("rtName").value = r.name || "";
+            document.getElementById("rtSales").value = r.entered_revenue !== null && r.entered_revenue !== undefined ? r.entered_revenue : "";
+            document.getElementById("rtGas").value = r.gas_price !== null ? r.gas_price : "";
+            document.getElementById("rtOrigin").value = r.origin_location_id || "";
+            document.getElementById("rtDest").value = r.dest_location_id || "";
+            document.getElementById("rtVehicle").value = r.vehicle_id || "";
+            document.getElementById("rtDriver").value = r.driver_id || "";
+          }
+          if(btnDel) btnDel.style.display = "inline-block";
+        }
+      });
+
+      const btnDel = document.getElementById("btnDeleteRoute");
+      if(btnDel){
+        btnDel.addEventListener("click", async () => {
+          const val = document.getElementById("routeSelect").value;
+          if(!val) return;
+          if(!confirm("Are you sure you want to delete this route?")) return;
+
+          try {
+            const res = await fetch(`/routes/${val}/delete`, { method: "POST" });
+            const data = await res.json();
+            if(data.success) window.location.reload();
+            else alert(data.message);
+          } catch(e) { alert("Error deleting route"); }
+        });
+      }
+    });
+  </script>

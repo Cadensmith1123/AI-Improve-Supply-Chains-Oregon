@@ -1,0 +1,29 @@
+  <!-- REUSABLE ASSIGN VEHICLE MODAL -->
+  <div class="modal-backdrop" id="modal-assign-vehicle">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="assignVehicleTitle">Assign Vehicle</div>
+        <button class="x" data-close>&times;</button>
+      </div>
+
+      <form method="post" id="assignVehicleForm" action="" novalidate>
+        <div class="modal-body">
+          <div class="field">
+            <label>Vehicle (optional)</label>
+            <select name="vehicle_id" id="assignVehicleSelect">
+              <option value="">-- Unassigned --</option>
+              {% for v in vehicles %}
+                <option value="{{ v.vehicle_id }}">{{ v.vehicle_name }}</option>
+              {% endfor %}
+            </select>
+            <div class="hint">This assigns a vehicle to the selected route.</div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn primary" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>

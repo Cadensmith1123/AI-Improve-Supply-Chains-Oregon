@@ -96,6 +96,10 @@ BEGIN
         INTO v_vehicle_mpg, v_depreciation, v_annual_insurance, v_annual_maintenance
         FROM scenarios
         WHERE scenario_id = p_scenario_id AND tenant_id = p_tenant_id;
+
+        IF p_depreciation IS NOT NULL THEN
+            SET v_depreciation = p_depreciation;
+        END IF;
     END IF;
 
     -- Route snapshot times (if route changed)

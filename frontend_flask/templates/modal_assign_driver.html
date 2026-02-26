@@ -1,0 +1,28 @@
+  <!-- ASSIGN DRIVER MODAL -->
+  <div class="modal-backdrop" id="modal-assign-driver">
+    <div class="modal" style="width: 400px;">
+      <div class="modal-header">
+        <div class="modal-title" id="assignDriverTitle">Assign Driver</div>
+        <button class="x" data-close>&times;</button>
+      </div>
+
+      <form method="post" id="assignDriverForm" action="">
+        <div class="modal-body">
+          <div class="field">
+            <label>Select Driver</label>
+            <select name="driver_id" id="assignDriverSelect">
+              <option value="">-- Unassigned --</option>
+              {% for d in drivers %}
+                <option value="{{ d.driver_id }}">{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn" type="button" data-close>Cancel</button>
+          <button class="btn primary" type="submit">Save Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
