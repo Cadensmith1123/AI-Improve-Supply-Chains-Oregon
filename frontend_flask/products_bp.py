@@ -36,7 +36,7 @@ def product_new_post():
     if not ok:
         abort(400)
 
-    return redirect(url_for("products.products_list"))
+    return redirect(request.form.get("next") or url_for("products.products_list"))
 
 @products_bp.post("/products/<product_id>/delete")
 def product_delete_post(product_id):
@@ -78,4 +78,4 @@ def product_edit_post(product_id):
     if not ok:
         abort(400)
 
-    return redirect(url_for("products.products_list"))
+    return redirect(request.form.get("next") or url_for("products.products_list"))

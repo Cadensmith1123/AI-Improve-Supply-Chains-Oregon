@@ -160,7 +160,7 @@ def update_manifest_item(
         str(item_name),
         _to_dec(quantity_loaded),
         _to_dec(snapshot_cost_per_item),
-        _to_int(snapshot_items_per_unit) or 1,
+        _to_dec(snapshot_items_per_unit) or Decimal(1),
         _to_dec(snapshot_unit_weight),
         _to_dec(snapshot_unit_volume),
         _to_dec(snapshot_price_per_item),

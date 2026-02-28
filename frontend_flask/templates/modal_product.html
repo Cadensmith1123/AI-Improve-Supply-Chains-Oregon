@@ -6,6 +6,7 @@
         <button class="x" data-close>&times;</button>
       </div>
       <form method="post" action="/products/new" id="productForm">
+        <input type="hidden" name="next" value="{{ request.url }}">
         <div class="modal-body">
           <div class="field">
             <label>Select Product to Edit</label>

@@ -148,17 +148,17 @@ def validate_load_form(form):
         errors["quantity"] = "Quantity is required."
     else:
         try:
-            quantity = int(qty_raw)
+            quantity = float(qty_raw)
             if quantity <= 0:
                 errors["quantity"] = "Quantity must be greater than 0."
         except ValueError:
-            errors["quantity"] = "Quantity must be a whole number."
+            errors["quantity"] = "Quantity must be a number."
 
     data = {
         "product_id": product_id,
         "quantity": quantity,
         "price_per_item": parse_optional_float(price_raw, "price_per_item", errors),
-        "items_per_unit": parse_optional_int(items_per_unit_raw, "items_per_unit", errors),
+        "items_per_unit": parse_optional_float(items_per_unit_raw, "items_per_unit", errors),
         "cost_per_item": parse_optional_float(cost_raw, "cost_per_item", errors),
         "unit_weight": parse_optional_float(weight_raw, "unit_weight", errors),
         "unit_volume": parse_optional_float(volume_raw, "unit_volume", errors),
@@ -185,14 +185,14 @@ def calculate_manifest_item_metrics(item, product=None):
         unit_price_f = 0.0
 
     try:
-        qty = int(item.get("quantity", 0))
+        qty = float(item.get("quantity", 0))
     except (TypeError, ValueError):
         qty = 0
 
     try:
-        items_per_unit = int(item.get("items_per_unit") or 1)
+        items_per_unit = float(item.get("items_per_unit") or 1)
     except (TypeError, ValueError):
-        items_per_unit = 1
+        items_per_unit = 1.0
 
     line_total = unit_price_f * qty * items_per_unit
     

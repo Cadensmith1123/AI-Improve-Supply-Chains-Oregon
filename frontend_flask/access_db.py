@@ -558,20 +558,24 @@ def get_route_manifest(route_id: int):
         p_id = name_to_code.get(item_name, item_name)
         
         out.append({
+            "manifest_item_id": i.get('manifest_item_id'),
             "product_id": p_id, 
             "product_name": item_name,
-            "quantity": i.get('quantity_loaded'),
+            "quantity": float(i.get('quantity_loaded') or 0),
             "unit_price": i.get('snapshot_price_per_item'),
-            "items_per_unit": i.get('snapshot_items_per_unit')
+            "items_per_unit": float(i.get('snapshot_items_per_unit') or 0),
+            "cost_per_item": i.get('snapshot_cost_per_item'),
+            "unit_weight": i.get('snapshot_unit_weight'),
+            "unit_volume": i.get('snapshot_unit_volume')
         })
     return out
 
 def add_product_to_route(
     route_id: int, 
     product_id, 
-    quantity: int, 
+    quantity: float, 
     price_per_item: Optional[float] = None, 
-    items_per_unit: Optional[int] = None,
+    items_per_unit: Optional[float] = None,
     cost_per_item: Optional[float] = None,
     unit_weight: Optional[float] = None,
     unit_volume: Optional[float] = None):
@@ -580,21 +584,42 @@ def add_product_to_route(
     if not prod:
         return False, "Product not found"
     
-    try:
-        scenario_management.add_manifest_items(
-            tenant_id=tid,
-            scenario_id=route_id,
-            item_name=prod['name'],
-            quantity_loaded=quantity,
-            cost_per_item=cost_per_item,
-            price_per_item=price_per_item,
-            items_per_unit=items_per_unit,
-            unit_weight_lbs=unit_weight,
-            unit_volume=unit_volume
-        )
-        return True, None
-    except Exception as e:
-        return False, str(e)
+    # Check if item already exists on this route
+    manifest = get_route_manifest(route_id)
+    existing_item = next((i for i in manifest if str(i['product_id']) == str(product_id)), None)
+
+    if existing_item:
+        try:
+            update.update_manifest_item_scoped(
+                manifest_item_id=existing_item['manifest_item_id'],
+                scenario_id=route_id,
+                item_name=prod['name'],
+                quantity_loaded=quantity,
+                snapshot_cost_per_item=cost_per_item,
+                snapshot_items_per_unit=items_per_unit,
+                snapshot_unit_weight=unit_weight,
+                snapshot_unit_volume=unit_volume,
+                snapshot_price_per_item=price_per_item
+            )
+            return True, None
+        except Exception as e:
+            return False, str(e)
+    else:
+        try:
+            scenario_management.add_manifest_items(
+                tenant_id=tid,
+                scenario_id=route_id,
+                item_name=prod['name'],
+                quantity_loaded=quantity,
+                cost_per_item=cost_per_item,
+                price_per_item=price_per_item,
+                items_per_unit=items_per_unit,
+                unit_weight_lbs=unit_weight,
+                unit_volume=unit_volume
+            )
+            return True, None
+        except Exception as e:
+            return False, str(e)
 
 def remove_product_from_route(route_id: int, product_id):
     # product_id passed from app.py is now product_code (mapped in get_route_manifest)

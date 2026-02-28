@@ -37,6 +37,9 @@ def _get_route_response_data(route_id):
             "unit_price": metrics["unit_price"],
             "items_per_unit": metrics["items_per_unit"],
             "line_total": metrics["line_total"],
+            "cost_per_item": item.get("cost_per_item"),
+            "unit_weight": item.get("unit_weight"),
+            "unit_volume": item.get("unit_volume"),
         })
     
     manifest.sort(key=lambda x: x["product_name"].lower())
@@ -488,6 +491,9 @@ def route_view_get(route_id: int):
             "unit_price": metrics["unit_price"],
             "items_per_unit": metrics["items_per_unit"],
             "line_total": metrics["line_total"],
+            "cost_per_item": item.get("cost_per_item"),
+            "unit_weight": item.get("unit_weight"),
+            "unit_volume": item.get("unit_volume"),
         })
 
     manifest.sort(key=lambda x: x["product_name"].lower())
