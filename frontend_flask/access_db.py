@@ -6,13 +6,13 @@ from db.functions.tennant_functions import (
     scoped_update as update, 
     scoped_delete as delete
 )
+import logic
 from db.functions import scenario_management
 
 def _get_tenant_id():
     """Helper to get tenant_id safely from Flask global context."""
     return g.get('tenant_id', 1)
 
-# --- Locations ---
 
 def list_locations():
     return read.view_locations_scoped()
@@ -39,8 +39,8 @@ def create_location(
             phone=phone,
             latitude=0.0,
             longitude=0.0,
-            avg_load_minutes=int(avg_load_minutes) if avg_load_minutes else 30,
-            avg_unload_minutes=int(avg_unload_minutes) if avg_unload_minutes else 30
+            avg_load_minutes=logic.safe_int(avg_load_minutes, 30),
+            avg_unload_minutes=logic.safe_int(avg_unload_minutes, 30)
         )
         return True, None, new_id
     except Exception as e:
@@ -70,8 +70,8 @@ def update_location(
             phone=phone,
             latitude=0.0,
             longitude=0.0,
-            avg_load_minutes=int(avg_load_minutes) if avg_load_minutes else 30,
-            avg_unload_minutes=int(avg_unload_minutes) if avg_unload_minutes else 30
+            avg_load_minutes=logic.safe_int(avg_load_minutes, 30),
+            avg_unload_minutes=logic.safe_int(avg_unload_minutes, 30)
         )
         return True, None
     except Exception as e:
@@ -86,7 +86,6 @@ def delete_location(location_id: int):
             return False, "Cannot delete location: It is used as an origin or destination in one or more routes."
         return False, str(e)
 
-# --- Drivers ---
 
 def list_drivers():
     return read.view_drivers_scoped()
@@ -101,8 +100,8 @@ def create_driver(name: str, hourly_drive_wage: str, hourly_load_wage: str):
     try:
         new_id = create.add_driver_scoped(
             name=name,
-            hourly_drive_wage=float(hourly_drive_wage) if hourly_drive_wage else 0.0,
-            hourly_load_wage=float(hourly_load_wage) if hourly_load_wage else 0.0
+            hourly_drive_wage=logic.safe_float(hourly_drive_wage),
+            hourly_load_wage=logic.safe_float(hourly_load_wage)
         )
         return True, None, new_id
     except Exception as e:
@@ -113,8 +112,8 @@ def update_driver(driver_id: int, name: str, hourly_drive_wage: str, hourly_load
         update.update_driver_scoped(
             driver_id=driver_id,
             name=name,
-            hourly_drive_wage=float(hourly_drive_wage) if hourly_drive_wage else 0.0,
-            hourly_load_wage=float(hourly_load_wage) if hourly_load_wage else 0.0
+            hourly_drive_wage=logic.safe_float(hourly_drive_wage),
+            hourly_load_wage=logic.safe_float(hourly_load_wage)
         )
         return True, None
     except Exception as e:
@@ -129,7 +128,6 @@ def delete_driver(driver_id: int):
             return False, "Cannot delete driver: They are assigned to one or more routes."
         return False, str(e)
 
-# --- Vehicles ---
 
 def list_vehicles():
     rows = read.view_vehicles_scoped()
@@ -156,19 +154,16 @@ def create_vehicle(
     storage_type: str = "Dry"
 ):
     try:
-        try:
-            cap_val = float(capacity.split()[0])
-        except (ValueError, IndexError, AttributeError):
-            cap_val = 1000.0
+        cap_val = logic.parse_capacity_string(capacity)
         
         new_id = create.add_vehicle_scoped(
             name=vehicle_name,
-            mpg=float(mpg) if mpg else 10.0,
-            purchase_price=float(purchase_price) if purchase_price else 0.0,
-            yearly_mileage=float(yearly_mileage) if yearly_mileage else 0.0,
-            salvage_value=float(salvage_value) if salvage_value else 0.0,
-            annual_insurance_cost=float(insurance_cost) if insurance_cost else 0.0,
-            annual_maintenance_cost=float(maintenance_cost) if maintenance_cost else 0.0,
+            mpg=logic.safe_float(mpg, 10.0),
+            purchase_price=logic.safe_float(purchase_price),
+            yearly_mileage=logic.safe_float(yearly_mileage),
+            salvage_value=logic.safe_float(salvage_value),
+            annual_insurance_cost=logic.safe_float(insurance_cost),
+            annual_maintenance_cost=logic.safe_float(maintenance_cost),
             max_weight_lbs=cap_val,
             max_volume_cubic_ft=1000,
             storage_type=storage_type
@@ -190,26 +185,22 @@ def update_vehicle(
     storage_type: str = "Dry"
 ):
     try:
-        try:
-            cap_val = float(capacity.split()[0])
-        except (ValueError, IndexError, AttributeError):
-            cap_val = 1000.0
+        cap_val = logic.parse_capacity_string(capacity)
         
         update.update_vehicle_scoped(
             vehicle_id=vehicle_id,
             name=vehicle_name,
-            mpg=float(mpg) if mpg else 10.0,
-            purchase_price=float(purchase_price) if purchase_price else 0.0,
-            yearly_mileage=float(yearly_mileage) if yearly_mileage else 0.0,
-            salvage_value=float(salvage_value) if salvage_value else 0.0,
-            annual_insurance_cost=float(insurance_cost) if insurance_cost else 0.0,
-            annual_maintenance_cost=float(maintenance_cost) if maintenance_cost else 0.0,
+            mpg=logic.safe_float(mpg, 10.0),
+            purchase_price=logic.safe_float(purchase_price),
+            yearly_mileage=logic.safe_float(yearly_mileage),
+            salvage_value=logic.safe_float(salvage_value),
+            annual_insurance_cost=logic.safe_float(insurance_cost),
+            annual_maintenance_cost=logic.safe_float(maintenance_cost),
             max_weight_lbs=cap_val,
             max_volume_cubic_ft=1000,
             storage_type=storage_type
         )
 
-        # Refresh all routes (scenarios) that use this vehicle to update snapshots (depreciation, mpg, etc.)
         tid = _get_tenant_id() # Needed for scenario_management
         scenarios = read.view_scenarios_scoped()
         for s in scenarios:
@@ -229,14 +220,12 @@ def delete_vehicle(vehicle_id: int):
             return False, "Cannot delete vehicle: It is assigned to one or more routes."
         return False, str(e)
 
-# --- Routes ---
 
 def list_routes():
     scenarios = read.view_scenarios_scoped()
     if not scenarios:
         return []
     
-    # Enrich with route definition names
     all_routes = read.view_routes_scoped()
     routes_map = {r['route_id']: r for r in all_routes}
     
@@ -244,82 +233,89 @@ def list_routes():
     for s in scenarios:
         r_def = routes_map.get(s.get('route_id'))
         
-        # Map DB columns to Frontend keys
         item = {
             "route_id": s.get('scenario_id'), 
             "run_date": s.get('run_date'),
             "name": r_def.get('name') if r_def else "Unknown Route",
             "origin_location_id": r_def.get('origin_location_id') if r_def else None,
             "dest_location_id": r_def.get('dest_location_id') if r_def else None,
-            "sales_amount": float(s.get('snapshot_total_revenue') or 0),
-            "entered_revenue": float(s.get('snapshot_total_revenue') or 0),
+            "sales_amount": logic.safe_float(s.get('snapshot_total_revenue')),
+            "entered_revenue": logic.safe_float(s.get('snapshot_total_revenue')),
             "vehicle_id": s.get('vehicle_id'),
             "driver_id": s.get('driver_id'),
-            "driver_cost": float(s.get('snapshot_driver_wage') or 0),
-            "load_cost": float(s.get('snapshot_driver_load_wage') or 0),
-            "unload_cost": float(s.get('snapshot_driver_load_wage') or 0),
-            "fuel_cost": 0.0, # Not directly in view_scenarios, calculated in details
+            "driver_cost": logic.safe_float(s.get('snapshot_driver_wage')),
+            "load_cost": logic.safe_float(s.get('snapshot_driver_load_wage')),
+            "unload_cost": logic.safe_float(s.get('snapshot_driver_load_wage')),
+            "fuel_cost": 0.0,
             "depreciation_cost": 0.0,
-            "insurance_cost": float(s.get('snapshot_daily_insurance') or 0),
-            "gas_price": float(s.get('snapshot_gas_price') or 0),
+            "insurance_cost": logic.safe_float(s.get('snapshot_daily_insurance')),
+            "gas_price": logic.safe_float(s.get('snapshot_gas_price')),
         }
         out.append(item)
     return out
 
-def get_route(route_id: int):
-    # route_id is scenario_id
-    tid = _get_tenant_id()
-    details = scenario_management.get_trip_details(tid, route_id)
-    if not details:
-        return None
-    
-    header = details['header']
-    
-    # Need origin/dest IDs from route definition
-    raw_scenarios = read.view_scenarios_scoped(ids=route_id)
-    if not raw_scenarios:
-        return None
-    raw_s = raw_scenarios[0]
-    real_route_id = raw_s.get('route_id')
-    
-    raw_routes = read.view_routes_scoped(ids=real_route_id)
-    raw_r = raw_routes[0] if raw_routes else {}
-    
-    start_location = read.view_locations_scoped(ids=raw_r.get('origin_location_id'))[0]
-    dest_location = read.view_locations_scoped(ids=raw_r.get('dest_location_id'))[0]
-    start_address = f"{start_location.get('address_street')} {start_location.get('city')} {start_location.get('state')}"
-    dest_address = f"{dest_location.get('address_street')} {dest_location.get('city')} {dest_location.get('state')}" 
+def _map_manifest_items(items):
+    """Helper to map raw DB manifest items to frontend structure."""
+    out = []
+    for i in items:
+        out.append({
+            "manifest_item_id": i.get('manifest_item_id'),
+            "product_id": i.get('product_id'), 
+            "product_name": i.get('product_name'),
+            "quantity": logic.safe_float(i.get('quantity_loaded')),
+            "unit_price": i.get('price_per_item'),
+            "items_per_unit": logic.safe_float(i.get('items_per_unit')),
+            "cost_per_item": i.get('cost_per_item'),
+            "unit_weight": i.get('unit_weight_lbs'),
+            "unit_volume": i.get('unit_volume')
+        })
+    return out
 
-    # Calculate costs
-    costs = scenario_management.build_trip_costs_row(details)
+def get_route(route_id: int):
+    tid = _get_tenant_id()
+    
+    result_sets = scenario_management.get_complete_route_details(tid, route_id)
+    
+    if not result_sets or not result_sets[0]:
+        return None
+    
+    header = result_sets[0][0]
+    items = result_sets[1]
+    
+    start_address = f"{header.get('origin_address_street')} {header.get('origin_city')} {header.get('origin_state')}"
+    dest_address = f"{header.get('dest_address_street')} {header.get('dest_city')} {header.get('dest_state')}"
+
+    totals = logic.aggregate_manifest_totals(items)
+    
+    costs = logic.calculate_trip_costs(header, items, totals)
 
     return {
         "route_id": route_id,
         "name": header.get('route_name'),
-        "origin_location_id": raw_r.get('origin_location_id'),
-        "dest_location_id": raw_r.get('dest_location_id'),
+        "origin_location_id": header.get('origin_location_id'),
+        "dest_location_id": header.get('dest_location_id'),
         "origin_address": start_address, 
         "dest_address": dest_address,
-        "base_sales_amount": float(header.get('entered_revenue') or 0),
-        "sales_amount": float(header.get('entered_revenue') or 0),
-        "vehicle_id": raw_s.get('vehicle_id'),
-        "driver_id": raw_s.get('driver_id'),
+        "items": items,  # Return raw items so we don't need to fetch them again
+        "manifest": _map_manifest_items(items), # Mapped items for frontend use
+        "base_sales_amount": logic.safe_float(header.get('entered_revenue')),
+        "sales_amount": logic.safe_float(header.get('entered_revenue')),
+        "vehicle_id": header.get('vehicle_id'),
+        "driver_id": header.get('driver_id'),
         "driver_name": header.get('driver_name'),
-        "driver_cost": float(header.get('driver_drive_rate') or 0),
-        "load_cost": float(header.get('driver_load_rate') or 0),
-        "unload_cost": float(header.get('driver_load_rate') or 0),
-        "fuel_cost": float(details.get('totals', {}).get('fuel_cost_est') or 0),
+        "driver_cost": logic.safe_float(header.get('driver_drive_rate')),
+        "load_cost": logic.safe_float(header.get('driver_load_rate')),
+        "unload_cost": logic.safe_float(header.get('driver_load_rate')),
+        "fuel_cost": logic.safe_float(costs.get('fuel_cost_est')), # Use calculated cost
         "depreciation_cost": 0.0,
-        "insurance_cost": float(header.get('daily_insurance') or 0),
-        "gas_price": float(header.get('gas_price') or 0),
-        # Calculated Metrics
-        "calc_driver_cost": float(costs.get('driver_cost_total_est') or 0),
-        "calc_fuel_cost": float(costs.get('fuel_cost_est') or 0),
-        "calc_vehicle_cost": float(costs.get('depreciation_cost_est') or 0) + float(costs.get('daily_insurance') or 0) + float(costs.get('daily_maintenance_cost') or 0),
-        "calc_cogs": float(costs.get('total_cogs') or 0),
-        "calc_total_cost": float(costs.get('driver_cost_total_est') or 0) + float(costs.get('fuel_cost_est') or 0) + float(costs.get('depreciation_cost_est') or 0) + float(costs.get('daily_insurance') or 0) + float(costs.get('daily_maintenance_cost') or 0) + float(costs.get('total_cogs') or 0),
+        "insurance_cost": logic.safe_float(header.get('daily_insurance')),
+        "gas_price": logic.safe_float(header.get('gas_price')),
+        "calc_driver_cost": logic.safe_float(costs.get('driver_cost_total_est')),
+        "calc_fuel_cost": logic.safe_float(costs.get('fuel_cost_est')),
+        "calc_vehicle_cost": logic.safe_float(costs.get('depreciation_cost_est')) + logic.safe_float(costs.get('daily_insurance')) + logic.safe_float(costs.get('daily_maintenance_cost')),
+        "calc_cogs": logic.safe_float(costs.get('total_cogs')),
+        "calc_total_cost": logic.safe_float(costs.get('driver_cost_total_est')) + logic.safe_float(costs.get('fuel_cost_est')) + logic.safe_float(costs.get('depreciation_cost_est')) + logic.safe_float(costs.get('daily_insurance')) + logic.safe_float(costs.get('daily_maintenance_cost')) + logic.safe_float(costs.get('total_cogs')),
         
-        # Audit Metrics
         "drive_minutes_est": costs.get("drive_minutes_est"),
         "load_minutes_plan": costs.get("load_minutes_plan"),
         "unload_minutes_plan": costs.get("unload_minutes_plan"),
@@ -365,22 +361,33 @@ def create_route(
     insurance_cost: Optional[float],
 ):
     tid = _get_tenant_id()
+    
+    depreciation = 0.0
+    daily_insurance = 0.0
+    daily_maintenance = 0.0
+    if vehicle_id:
+        v = get_vehicle(vehicle_id)
+        if v:
+            miles, _ = logic.get_trip_length()
+            depreciation, daily_insurance, daily_maintenance = logic.calculate_operating_costs(v, miles)
+
     try:
-        # 1. Create Route Definition
         real_route_id = create.add_route_scoped(
             name=name,
             origin_location_id=origin_location_id,
             dest_location_id=dest_location_id
         )
         
-        # 2. Create Scenario
         scenario_id = scenario_management.create_scenario(
             tenant_id=tid,
             route_id=real_route_id,
             total_revenue=sales_amount,
             vehicle_id=vehicle_id,
             driver_id=driver_id,
-            current_gas_price=gas_price if gas_price is not None else 4.50
+            current_gas_price=logic.safe_float(gas_price, 4.50),
+            depreciation=depreciation,
+            daily_insurance=daily_insurance,
+            daily_maintenance=daily_maintenance
         )
         return True, None, scenario_id
     except Exception as e:
@@ -404,17 +411,28 @@ def update_route(
     driver_id: Optional[int] = None,
 ):
     tid = _get_tenant_id()
+    
+    depreciation = None
+    daily_insurance = None
+    daily_maintenance = None
+    if vehicle_id:
+        v = get_vehicle(vehicle_id)
+        if v:
+            miles, _ = logic.get_trip_length()
+            depreciation, daily_insurance, daily_maintenance = logic.calculate_operating_costs(v, miles)
+
     try:
-        # Update Scenario
         scenario_management.update_scenario(
             tenant_id=tid,
             scenario_id=route_id,
             total_revenue=sales_amount,
             vehicle_id=vehicle_id,
-            driver_id=driver_id
+            driver_id=driver_id,
+            depreciation=depreciation,
+            daily_insurance=daily_insurance,
+            daily_maintenance=daily_maintenance
         )
         
-        # Update Route Definition
         raw_scenarios = read.view_scenarios_scoped(ids=route_id)
         if raw_scenarios:
             real_route_id = raw_scenarios[0].get('route_id')
@@ -432,20 +450,31 @@ def update_route(
 def delete_route(route_id: int):
     tid = _get_tenant_id()
     try:
-        # route_id here refers to the scenario_id
         delete.delete_plan_scoped(scenario_id=route_id)
         return True, None
     except Exception as e:
-        # Manifest items usually cascade, but if there are other constraints:
         return False, str(e)
 
 def assign_vehicle_to_route(route_id: int, vehicle_id: Optional[int]):
     tid = _get_tenant_id()
+    
+    depreciation = None
+    daily_insurance = None
+    daily_maintenance = None
+    if vehicle_id:
+        v = get_vehicle(vehicle_id)
+        if v:
+            miles, _ = logic.get_trip_length()
+            depreciation, daily_insurance, daily_maintenance = logic.calculate_operating_costs(v, miles)
+            
     try:
         scenario_management.update_scenario(
             tenant_id=tid,
             scenario_id=route_id,
-            vehicle_id=vehicle_id
+            vehicle_id=vehicle_id,
+            depreciation=depreciation,
+            daily_insurance=daily_insurance,
+            daily_maintenance=daily_maintenance
         )
         return True, None
     except Exception as e:
@@ -466,31 +495,70 @@ def assign_driver_to_route(route_id: int, driver_id: Optional[int]):
 def recalculate_route_costs(route_id: int):
     tid = _get_tenant_id()
     try:
-        scenario_management.refresh_scenario(tid, route_id)
+        scenarios = read.view_scenarios_scoped(ids=route_id)
+        if not scenarios:
+            return False, "Scenario not found"
+        
+        vehicle_id = scenarios[0].get('vehicle_id')
+        
+        depreciation = 0.0
+        daily_insurance = 0.0
+        daily_maintenance = 0.0
+        if vehicle_id:
+            v = get_vehicle(vehicle_id)
+            if v:
+                miles, _ = logic.get_trip_length()
+                depreciation, daily_insurance, daily_maintenance = logic.calculate_operating_costs(v, miles)
+        
+        scenario_management.refresh_scenario(tid, route_id, depreciation, daily_insurance, daily_maintenance)
         return True, None
     except Exception as e:
         return False, str(e)
 
 def get_all_routes_raw():
     tid = _get_tenant_id()
+    # Use optimized fetch for all scenarios
     scenarios = read.view_scenarios_scoped()
     out = []
     for s in scenarios:
-        d = scenario_management.get_trip_details(tid, s['scenario_id'])
-        if d: out.append(d)
+        # Reuse the optimized complete fetch
+        result_sets = scenario_management.get_complete_route_details(tid, s['scenario_id'])
+        if result_sets and result_sets[0]:
+            header = result_sets[0][0]
+            items = result_sets[1]
+            costs = logic.calculate_trip_costs(header, items)
+            out.append(costs)
     return out
 
 def get_route_raw(route_id):
     tid = _get_tenant_id()
-    return scenario_management.get_trip_details(tid, route_id)
+    result_sets = scenario_management.get_complete_route_details(tid, route_id)
+    
+    if result_sets and result_sets[0]:
+        header = result_sets[0][0]
+        items = result_sets[1]
+        d = {'header': header, 'items': items}
+        costs = logic.calculate_trip_costs(d['header'], d['items'])
+        d['costs'] = costs
+    return d
 
 def export_routes_csv(details_list, output_handle):
-    scenario_management.export_summary_csv(details_list, output_handle)
+    csv_str = logic.generate_csv_export(details_list)
+    output_handle.write(csv_str)
 
 def export_route_detailed_csv(details, output_handle):
-    scenario_management.export_trip_csv(details, output_handle)
+    items = details.get('items', [])
+    header = details.get('header', {})
+    
+    flat_list = []
+    for i in items:
+        row = header.copy()
+        row.update(i)
+        flat_list.append(row)
+        
+    csv_str = logic.generate_csv_export(flat_list)
+    output_handle.write(csv_str)
 
-# --- Products ---
 
 def list_products():
     rows = read.view_products_master_scoped()
@@ -509,7 +577,6 @@ def get_product(product_id):
 
 def create_product(product_name: str, sku: str, storage_type: str):
     try:
-        # Using sku as product_code
         new_id = create.add_product_master_scoped(
             product_code=sku,
             name=product_name,
@@ -539,36 +606,20 @@ def delete_product(product_code: str):
             return False, "Cannot delete product: It is present on one or more route manifests."
         return False, str(e)
 
-# --- Route Products (Manifest) ---
 
 def get_route_manifest(route_id: int):
-    all_items = read.view_manifest_items_scoped()
+    """
+    Fetches manifest items for a specific route using the optimized stored procedure.
+    """
+    tid = _get_tenant_id()
+    result_sets = scenario_management.get_complete_route_details(tid, route_id)
     
-    # We need to map item_name back to product_code so app.py can look up product details
-    all_products = read.view_products_master_scoped()
-    name_to_code = {p['name']: p['product_code'] for p in all_products}
+    if not result_sets or len(result_sets) < 2:
+        return []
     
-    out = []
-    for i in all_items:
-        if i.get('scenario_id') != route_id:
-            continue
-            
-        item_name = i.get('item_name')
-        # Map name to code if possible, else use name
-        p_id = name_to_code.get(item_name, item_name)
-        
-        out.append({
-            "manifest_item_id": i.get('manifest_item_id'),
-            "product_id": p_id, 
-            "product_name": item_name,
-            "quantity": float(i.get('quantity_loaded') or 0),
-            "unit_price": i.get('snapshot_price_per_item'),
-            "items_per_unit": float(i.get('snapshot_items_per_unit') or 0),
-            "cost_per_item": i.get('snapshot_cost_per_item'),
-            "unit_weight": i.get('snapshot_unit_weight'),
-            "unit_volume": i.get('snapshot_unit_volume')
-        })
-    return out
+    items = result_sets[1]
+    
+    return _map_manifest_items(items)
 
 def add_product_to_route(
     route_id: int, 
@@ -584,7 +635,6 @@ def add_product_to_route(
     if not prod:
         return False, "Product not found"
     
-    # Check if item already exists on this route
     manifest = get_route_manifest(route_id)
     existing_item = next((i for i in manifest if str(i['product_id']) == str(product_id)), None)
 
@@ -622,10 +672,8 @@ def add_product_to_route(
             return False, str(e)
 
 def remove_product_from_route(route_id: int, product_id):
-    # product_id passed from app.py is now product_code (mapped in get_route_manifest)
     target_code = str(product_id)
     
-    # Resolve code to name to find the manifest item
     all_products = read.view_products_master_scoped()
     target_name = None
     for p in all_products:
@@ -636,14 +684,13 @@ def remove_product_from_route(route_id: int, product_id):
     if not target_name:
         target_name = target_code
     
-    all_items = read.view_manifest_items_scoped()
+    # Optimization: Only fetch items for this route, not the entire table
+    manifest = get_route_manifest(route_id)
     item_to_delete = None
-    
-    for item in all_items:
-        if item.get('scenario_id') == route_id:
-            if item.get('item_name') == target_name:
-                item_to_delete = item.get('manifest_item_id')
-                break
+    for item in manifest:
+        if item.get('product_name') == target_name:
+            item_to_delete = item.get('manifest_item_id')
+            break
     
     if item_to_delete:
         try:

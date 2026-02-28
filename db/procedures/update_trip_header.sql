@@ -12,7 +12,9 @@ CREATE PROCEDURE update_trip_header(
     IN p_run_date DATE,
     IN p_current_gas_price DECIMAL(6,3),
     IN p_total_revenue DECIMAL(12,2),
-    IN p_depreciation DECIMAL(5,3)
+    IN p_depreciation DECIMAL(5,3),
+    IN p_daily_insurance DECIMAL(10,2),
+    IN p_daily_maintenance DECIMAL(10,2)
 )
 BEGIN
     -- Current values
@@ -28,8 +30,8 @@ BEGIN
     DECLARE v_driver_load_wage DECIMAL(5,2);
     DECLARE v_vehicle_mpg DECIMAL(4,1);
     DECLARE v_depreciation DECIMAL(5,3);
-    DECLARE v_annual_insurance DECIMAL(10,2);
-    DECLARE v_annual_maintenance DECIMAL(10,2);
+    DECLARE v_daily_insurance DECIMAL(10,2);
+    DECLARE v_daily_maintenance DECIMAL(10,2);
     DECLARE v_load_time INT;
     DECLARE v_unload_time INT;
 
@@ -83,22 +85,29 @@ BEGIN
     IF v_new_vehicle_id IS NULL THEN
         SET v_vehicle_mpg = 0.0;
         SET v_depreciation = 0.000;
-        SET v_annual_insurance = 0.00;
-        SET v_annual_maintenance = 0.00;
+        SET v_daily_insurance = 0.00;
+        SET v_daily_maintenance = 0.00;
     ELSEIF v_new_vehicle_id <> v_vehicle_id OR v_vehicle_id IS NULL THEN
-        SELECT mpg, annual_insurance_cost, annual_maintenance_cost
-        INTO v_vehicle_mpg, v_annual_insurance, v_annual_maintenance
+        SELECT mpg
+        INTO v_vehicle_mpg
         FROM vehicles
         WHERE vehicle_id = v_new_vehicle_id AND tenant_id = p_tenant_id;
+        
         SET v_depreciation = p_depreciation;
+        SET v_daily_insurance = p_daily_insurance;
+        SET v_daily_maintenance = p_daily_maintenance;
     ELSE
-        SELECT snapshot_vehicle_mpg, snapshot_depreciation_per_mile, (snapshot_daily_insurance * 365.0), (snapshot_daily_maintenance_cost * 365.0)
-        INTO v_vehicle_mpg, v_depreciation, v_annual_insurance, v_annual_maintenance
+        SELECT snapshot_vehicle_mpg, snapshot_depreciation_per_mile, snapshot_daily_insurance, snapshot_daily_maintenance_cost
+        INTO v_vehicle_mpg, v_depreciation, v_daily_insurance, v_daily_maintenance
         FROM scenarios
         WHERE scenario_id = p_scenario_id AND tenant_id = p_tenant_id;
 
         IF p_depreciation IS NOT NULL THEN
             SET v_depreciation = p_depreciation;
+        END IF;
+        IF p_daily_insurance IS NOT NULL THEN
+            SET v_daily_insurance = p_daily_insurance;
+            SET v_daily_maintenance = p_daily_maintenance;
         END IF;
     END IF;
 
@@ -137,8 +146,8 @@ BEGIN
         snapshot_gas_price = COALESCE(p_current_gas_price, snapshot_gas_price),
         snapshot_depreciation_per_mile = COALESCE(v_depreciation, snapshot_depreciation_per_mile),
 
-        snapshot_daily_insurance = COALESCE((COALESCE(v_annual_insurance, 0.00) / 365.0), snapshot_daily_insurance),
-        snapshot_daily_maintenance_cost = COALESCE((COALESCE(v_annual_maintenance, 0.00) / 365.0), snapshot_daily_maintenance_cost),
+        snapshot_daily_insurance = COALESCE(v_daily_insurance, snapshot_daily_insurance),
+        snapshot_daily_maintenance_cost = COALESCE(v_daily_maintenance, snapshot_daily_maintenance_cost),
 
         snapshot_planned_load_minutes = COALESCE(v_load_time, snapshot_planned_load_minutes),
         snapshot_planned_unload_minutes = COALESCE(v_unload_time, snapshot_planned_unload_minutes),

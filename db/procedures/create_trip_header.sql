@@ -11,14 +11,14 @@ CREATE PROCEDURE create_trip_header(
     IN p_current_gas_price DECIMAL(6,3),
     IN p_total_revenue DECIMAL(12,2),
     IN p_depreciation DECIMAL(5,3),
+    IN p_daily_insurance DECIMAL(10,2),
+    IN p_daily_maintenance DECIMAL(10,2),
     OUT p_new_scenario_id INT -- Returns ID so Python can add items
 )
 BEGIN
     DECLARE v_driver_wage DECIMAL(5,2);
     DECLARE v_driver_load_wage DECIMAL(5,2);
     DECLARE v_vehicle_mpg DECIMAL(4,1);
-    DECLARE v_annual_insurance DECIMAL(10,2);
-    DECLARE v_annual_maintenance DECIMAL(10,2);
     DECLARE v_load_time INT;
     DECLARE v_unload_time INT;
 
@@ -31,8 +31,8 @@ BEGIN
 
     -- 2. Get Vehicle Snapshot
     IF p_vehicle_id IS NOT NULL THEN
-        SELECT mpg, annual_insurance_cost, annual_maintenance_cost
-        INTO v_vehicle_mpg, v_annual_insurance, v_annual_maintenance
+        SELECT mpg
+        INTO v_vehicle_mpg
         FROM vehicles WHERE vehicle_id = p_vehicle_id AND tenant_id = p_tenant_id;
     END IF;
 
@@ -63,7 +63,7 @@ BEGIN
         v_driver_wage, v_driver_load_wage,
         v_vehicle_mpg, p_current_gas_price,
         p_depreciation,
-        (v_annual_insurance / 365.0), (v_annual_maintenance / 365.0),
+        p_daily_insurance, p_daily_maintenance,
         v_load_time, v_unload_time,
         p_total_revenue
     );

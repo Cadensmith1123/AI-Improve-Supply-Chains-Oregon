@@ -1,3 +1,6 @@
+from decimal import Decimal
+import pandas as pd
+
 def parse_optional_float(raw: str, field_key: str, errors: dict):
     raw = (raw or "").strip()
     if raw == "":
@@ -145,7 +148,7 @@ def validate_load_form(form):
         product_id = product_raw
 
     if not qty_raw:
-        errors["quantity"] = "Quantity is required."
+        quantity = 1.0
     else:
         try:
             quantity = float(qty_raw)
@@ -166,39 +169,261 @@ def validate_load_form(form):
     return data, errors
 
 
-def calculate_route_cost(route):
-    total_cost = 0.0
-    for k in ["driver_cost", "load_cost", "unload_cost", "fuel_cost", "depreciation_cost", "insurance_cost"]:
-        v = route.get(k)
-        total_cost += float(v) if v is not None else 0.0
-    return total_cost
+def safe_float(val, default=0.0):
+    """Safely converts a value to float, returning default on failure."""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_int(val, default=0):
+    """Safely converts a value to int, returning default on failure."""
+    if val is None:
+        return default
+    try:
+        # Handle strings like "30.0" by converting to float first
+        return int(float(val))
+    except (ValueError, TypeError):
+        return default
+
+
+def to_decimal(val, default="0"):
+    """Helper to safely convert values to Decimal."""
+    if val is None:
+        return Decimal(default)
+    try:
+        return Decimal(str(val))
+    except Exception:
+        return Decimal(default)
+
+def parse_capacity_string(capacity, default=1000.0):
+    """Parses a capacity string like '1000 lbs' into a float."""
+    cap_str = str(capacity).split()[0] if capacity else ""
+    return safe_float(cap_str, default)
+
+def get_trip_length():
+    """
+    Returns trip distance (miles) and time (minutes).
+    Currently a stub for a future external API call.
+    """
+    miles_est =  25.2
+    time_est = 80.5
+    return miles_est, time_est
+
+def calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles):
+    rate = Decimal("3.000")
+    return rate * to_decimal(trip_miles)
+
+def calculate_insurance(annual_insurance_cost):
+    return Decimal(5.00)
+
+def calculate_maintenance(annual_maintenance_cost, yearly_mileage, trip_miles):
+    return Decimal(3.5)
+
+def calculate_operating_costs(vehicle, trip_miles):
+    """
+    Calculates operating costs (depreciation, insurance, maintenance) for a vehicle.
+    Returns tuple: (depreciation_per_mile, daily_insurance, daily_maintenance)
+    """
+    if not vehicle:
+        return Decimal("0.0"), Decimal("0.0"), Decimal("0.0")
+    
+    # Extract values safely
+    purchase_price = vehicle.get('purchase_price')
+    salvage_value = vehicle.get('salvage_value')
+    yearly_mileage = vehicle.get('yearly_mileage')
+    annual_insurance = vehicle.get('annual_insurance_cost')
+    annual_maintenance = vehicle.get('annual_maintenance_cost')
+
+    dep = calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles)
+    ins = calculate_insurance(annual_insurance)
+    maint = calculate_maintenance(annual_maintenance, yearly_mileage, trip_miles)
+    
+    return dep, ins, maint
+
+def calculate_driver_costs(drive_minutes, load_minutes, unload_minutes, drive_rate, load_rate):
+    """
+    Calculates driver costs based on time and rates.
+    Returns tuple: (drive_cost, load_cost, unload_cost, total_driver_cost)
+    """
+    drive_cost = (drive_minutes / 60) * drive_rate
+    load_cost = (load_minutes / 60) * load_rate
+    unload_cost = (unload_minutes / 60) * load_rate
+    total_cost = drive_cost + load_cost + unload_cost
+    
+    return drive_cost, load_cost, unload_cost, total_cost
+
+def calculate_fuel_cost(miles, mpg, gas_price, estimated_cost=0.0):
+    """
+    Calculates fuel cost based on mileage, MPG, and gas price.
+    Prioritizes estimated_cost if provided (e.g. from external API).
+    """
+    if estimated_cost > 0:
+        return estimated_cost
+        
+    if mpg > 0:
+        return (miles / mpg) * gas_price
+        
+    return 0.0
+
+
+def calculate_trip_costs(header, items, totals=None):
+    """
+    Calculates the full financial breakdown of a trip.
+    """
+    if totals is None:
+        totals = {}
+
+    drive_rate = safe_float(header.get("driver_drive_rate"))
+    load_rate = safe_float(header.get("driver_load_rate"))
+    daily_ins = safe_float(header.get("daily_insurance"))
+    depreciation_cost = safe_float(header.get("depreciation_per_mile"))
+    maintenance_cost = safe_float(header.get("daily_maintenance_cost"))
+    
+    vehicle_mpg = safe_float(header.get("vehicle_mpg"))
+    gas_price = safe_float(header.get("gas_price"))
+
+    load_min = safe_float(header.get("plan_load_min"))
+    unload_min = safe_float(header.get("plan_unload_min"))
+    miles_est, drive_min = get_trip_length()
+
+    driver_drive_cost, driver_load_cost, driver_unload_cost, driver_total_cost = calculate_driver_costs(
+        drive_min, load_min, unload_min, drive_rate, load_rate
+    )
+
+    est_fuel = safe_float(totals.get("fuel_cost_est"))
+    final_fuel_cost = calculate_fuel_cost(miles_est, vehicle_mpg, gas_price, est_fuel)
+
+    total_cogs = safe_float(totals.get("total_cogs"))
+    total_weight = safe_float(totals.get("total_weight_lbs"))
+    total_volume = safe_float(totals.get("total_volume"))
+    calculated_revenue = safe_float(totals.get("calculated_revenue"))
+    entered_revenue = safe_float(header.get("entered_revenue"))
+
+    total_cost_est = total_cogs + driver_total_cost + daily_ins + maintenance_cost + final_fuel_cost + depreciation_cost
+
+    profit_vs_entered = entered_revenue - total_cost_est
+    profit_vs_calculated = calculated_revenue - total_cost_est
+
+    return {
+        "scenario_id": header.get("scenario_id"),
+        "run_date": header.get("run_date"),
+        "route_name": header.get("route_name"),
+        "vehicle_name": header.get("vehicle_name"),
+        "driver_name": header.get("driver_name"),
+
+        "drive_minutes_est": drive_min,
+        "load_minutes_plan": load_min,
+        "unload_minutes_plan": unload_min,
+
+        "driver_drive_rate_per_hr": drive_rate,
+        "driver_load_rate_per_hr": load_rate,
+
+        "daily_insurance": daily_ins,
+        "daily_maintenance_cost": maintenance_cost,
+        "depreciation_cost_est": round(depreciation_cost, 2),
+        "fuel_cost_est": round(final_fuel_cost, 2),
+
+        "driver_drive_cost_est": round(driver_drive_cost, 2),
+        "driver_load_cost_est": round(driver_load_cost, 2),
+        "driver_unload_cost_est": round(driver_unload_cost, 2),
+        "driver_cost_total_est": round(driver_total_cost, 2),
+
+        "line_item_count": len(items),
+        "total_weight_lbs": round(total_weight, 2),
+        "total_volume": round(total_volume, 2),
+
+        "total_cogs": round(total_cogs, 2),
+        "entered_revenue": round(entered_revenue, 2),
+        "calculated_revenue": round(calculated_revenue, 2),
+
+        "profit_est_entered": round(profit_vs_entered, 2),
+        "profit_est_calculated": round(profit_vs_calculated, 2),
+
+        "margin_est_entered": round((profit_vs_entered / entered_revenue) if entered_revenue else 0, 4),
+        "margin_est_calculated": round((profit_vs_calculated / calculated_revenue) if calculated_revenue else 0, 4),
+        "total_distance_miles": round(miles_est, 1),
+        
+        "total_cost": round(total_cost_est, 2)
+    }
 
 
 def calculate_manifest_item_metrics(item, product=None):
+    """
+    Calculates metrics for a single line item.
+    Used by both the UI (preview) and the Backend (aggregation).
+    """
     unit_price = item.get("unit_price")
-    if unit_price is None and product:
+    if unit_price is None or unit_price == "":
+        unit_price = item.get("price_per_item")
+
+    if (unit_price is None or unit_price == "") and product:
         unit_price = product.get("unit_price")
     
-    try:
-        unit_price_f = float(unit_price) if unit_price is not None else 0.0
-    except (TypeError, ValueError):
-        unit_price_f = 0.0
+    unit_price_f = safe_float(unit_price)
+    
+    qty_val = item.get("quantity")
+    if qty_val is None or qty_val == "":
+        qty_val = item.get("quantity_loaded")
+    qty = safe_float(qty_val)
+    
+    items_per_unit = safe_float(item.get("items_per_unit"), 1.0)
 
-    try:
-        qty = float(item.get("quantity", 0))
-    except (TypeError, ValueError):
-        qty = 0
-
-    try:
-        items_per_unit = float(item.get("items_per_unit") or 1)
-    except (TypeError, ValueError):
-        items_per_unit = 1.0
+    cost = safe_float(item.get("cost_per_item"))
+    weight = safe_float(item.get("unit_weight") or item.get("unit_weight_lbs"))
+    volume = safe_float(item.get("unit_volume"))
 
     line_total = unit_price_f * qty * items_per_unit
+    line_cogs = cost * qty * items_per_unit
+    line_weight = weight * qty
+    line_volume = volume * qty
     
     return {
         "quantity": qty,
         "unit_price": unit_price_f,
         "items_per_unit": items_per_unit,
-        "line_total": line_total
+        "line_total": line_total,
+        
+        "line_cogs": line_cogs,
+        "line_weight": line_weight,
+        "line_volume": line_volume
     }
+
+
+def aggregate_manifest_totals(items):
+    """
+    Calculates aggregate totals (COGS, revenue, weight, volume) for a list of manifest items.
+    """
+    total_cogs = 0.0
+    total_rev = 0.0
+    total_weight = 0.0
+    total_volume = 0.0
+    
+    for i in items:
+        m = calculate_manifest_item_metrics(i)
+        total_cogs += m["line_cogs"]
+        total_rev += m["line_total"]
+        total_weight += m["line_weight"]
+        total_volume += m["line_volume"]
+        
+    return {
+        "total_cogs": total_cogs,
+        "calculated_revenue": total_rev,
+        "total_weight_lbs": total_weight,
+        "total_volume": total_volume
+    }
+
+
+def generate_csv_export(data_list, mode="summary"):
+    """
+    Generates CSV string from list of dicts.
+    mode: 'summary' (list of routes) or 'detail' (single route with items)
+    """
+    if not data_list:
+        return ""
+    
+    df = pd.DataFrame(data_list)
+    return df.to_csv(index=False)
