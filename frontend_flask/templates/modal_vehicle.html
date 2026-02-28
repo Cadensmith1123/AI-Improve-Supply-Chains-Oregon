@@ -8,7 +8,7 @@
       <form method="post" action="/vehicles/new" id="vehicleForm">
         <div class="modal-body">
           <div class="field">
-            <label>Select Vehicle to Edit</label>
+            <label>Select Vehicle</label>
             <select id="vehicleSelect">
               <option value="">-- Add New Vehicle --</option>
               <!-- Populated by JS -->
@@ -22,7 +22,7 @@
               <input name="vehicle_name" id="vehName" placeholder="e.g., Truck-12" required>
             </div>
             <div class="field">
-              <label>Capacity (lbs)</label>
+              <label>Max Weight (lbs)</label>
               <input name="capacity" id="vehCap" placeholder="e.g., 26000">
             </div>
           </div>
@@ -33,7 +33,7 @@
               <input name="mpg" id="vehMpg" placeholder="e.g., 8.5">
             </div>
             <div class="field">
-              <label>Est. Yearly Miles</label>
+              <label>Est. Yearly Mileage</label>
               <input name="yearly_mileage" id="vehMiles" placeholder="e.g., 20000">
             </div>
           </div>
@@ -69,7 +69,7 @@
               <option value="Multi">Multi-Temp</option>
             </select>
           </div>
-          <div class="hint">Vehicles can be assigned to any route from the table.</div>
+          <div class="hint">Vehicles can be assigned to routes in the Route Manager.</div>
         </div>
         <div class="modal-actions">
           <button class="btn" type="button" id="btnDeleteVehicle" style="background-color:#dc2626; color:white; border:0; margin-right:auto; display:none;">Delete</button>

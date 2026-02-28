@@ -134,7 +134,7 @@
       <div style="display:flex; gap:10px;">
         <a class="btn" href="/routes">Back</a>
         <a class="btn" href="{{ url_for('routes.route_export_csv', route_id=route.route_id) }}">Export CSV</a>
-        <a class="btn" href="/routes/{{ route.route_id }}/edit">Edit</a>
+        <button class="btn" id="btnEditRoute">Edit</button>
       </div>
     </div>
 
@@ -285,6 +285,7 @@
           <tr>
             <th>Product</th>
             <th>Qty</th>
+            <th>Items/Unit</th>
             <th>Unit Price</th>
             <th>Line Total</th>
           </tr>
@@ -292,7 +293,7 @@
         <tbody>
           {% if manifest|length == 0 %}
             <tr>
-              <td colspan="4" class="muted">No products on this route yet.</td>
+              <td colspan="5" class="muted">No products on this route yet.</td>
             </tr>
           {% endif %}
 
@@ -300,6 +301,7 @@
           <tr>
             <td>{{ item.product_name }}</td>
             <td>{{ item.quantity }}</td>
+            <td>{{ item.items_per_unit }}</td>
             <td>
               {% if item.unit_price is not none %}
                 ${{ "%.2f"|format(item.unit_price) }}
@@ -329,6 +331,7 @@
 
   <script>
     const routeId = {{ route.route_id }};
+    const currentRoute = {{ route | tojson }};
     const currentVehicleId = "{{ route.vehicle_id if route.vehicle_id else '' }}";
     const currentDriverId = "{{ route.driver_id if route.driver_id else '' }}";
     let manifestData = {{ manifest | tojson }};
@@ -390,6 +393,35 @@
       openModal("modal-assign-driver");
     });
 
+    // Edit Route Logic
+    document.getElementById("btnEditRoute").addEventListener("click", () => {
+      const form = document.querySelector("#modal-route form");
+      form.action = `/routes/${routeId}/edit`;
+      
+      document.querySelector("#modal-route .modal-title").textContent = `Edit Route #${routeId}`;
+      
+      const sel = document.getElementById("routeSelect");
+      if(sel) {
+        sel.value = routeId;
+        sel.disabled = true;
+      }
+
+      const setVal = (name, val) => {
+          const inp = form.querySelector(`[name="${name}"]`);
+          if(inp) inp.value = (val === null || val === undefined) ? "" : val;
+      };
+
+      setVal("name", currentRoute.name);
+      setVal("origin_location_id", currentRoute.origin_location_id);
+      setVal("dest_location_id", currentRoute.dest_location_id);
+      setVal("sales_amount", currentRoute.base_sales_amount);
+      setVal("vehicle_id", currentRoute.vehicle_id);
+      setVal("driver_id", currentRoute.driver_id);
+      setVal("gas_price", currentRoute.gas_price);
+      
+      openModal("modal-route");
+    });
+
     // Recalculate Costs Logic
     document.getElementById("btnRecalcCosts").addEventListener("click", async () => {
       if(!confirm("This will update cost snapshots (wages, mpg, etc.) from the current master data. Continue?")) return;
@@ -411,7 +443,7 @@
 
       if(!manifest.length){
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td class="muted" colspan="3" style="padding:12px;">No products on this route yet.</td>`;
+        tr.innerHTML = `<td class="muted" colspan="5" style="padding:12px;">No products on this route yet.</td>`;
         tbody.appendChild(tr);
         return;
       }
@@ -421,6 +453,8 @@
         tr.innerHTML = `
           <td style="font-weight:900;">${item.product_name}</td>
           <td>${item.quantity}</td>
+          <td>${item.items_per_unit || 1}</td>
+          <td>${item.unit_price ? '$'+parseFloat(item.unit_price).toFixed(2) : '-'}</td>
           <td>
             <button class="btn small remove-item-btn" type="button" 
               data-route-id="${routeId}" 
