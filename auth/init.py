@@ -17,9 +17,5 @@ def init_auth(app):
     if not app.config.get("JWT_SECRET"):
         raise RuntimeError("JWT_SECRET is not set. Add it to .env or app.config['JWT_SECRET'].")
 
-    # Register blueprint
-    # /auth/login will be available after this
     app.register_blueprint(auth_bp, url_prefix="/auth")
-
-    # Install auth middleware
     install_auth_middleware(app)

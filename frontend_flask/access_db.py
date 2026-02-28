@@ -1,20 +1,18 @@
-# access_db.py
 from flask import g
 from typing import Optional
-from db.functions.tennant_functions import scoped_read as read, scoped_create as create, scoped_update as update, scoped_delete as delete
+from db.functions.tennant_functions import (
+    scoped_read as read, 
+    scoped_create as create, 
+    scoped_update as update, 
+    scoped_delete as delete
+)
 from db.functions import scenario_management
-from decimal import Decimal
 
-# Helper to get tenant_id safely
 def _get_tenant_id():
-    try:
-        return g.tenant_id
-    except (RuntimeError, AttributeError):
-        return 1
+    """Helper to get tenant_id safely from Flask global context."""
+    return g.get('tenant_id', 1)
 
-# --------------------
-# Locations
-# --------------------
+# --- Locations ---
 
 def list_locations():
     return read.view_locations_scoped()
@@ -88,9 +86,7 @@ def delete_location(location_id: int):
             return False, "Cannot delete location: It is used as an origin or destination in one or more routes."
         return False, str(e)
 
-# --------------------
-# Drivers
-# --------------------
+# --- Drivers ---
 
 def list_drivers():
     return read.view_drivers_scoped()
@@ -133,9 +129,7 @@ def delete_driver(driver_id: int):
             return False, "Cannot delete driver: They are assigned to one or more routes."
         return False, str(e)
 
-# --------------------
-# Vehicles
-# --------------------
+# --- Vehicles ---
 
 def list_vehicles():
     rows = read.view_vehicles_scoped()
@@ -162,12 +156,10 @@ def create_vehicle(
     storage_type: str = "Dry"
 ):
     try:
-        cap_val = 1000
-        if capacity:
-            try:
-                cap_val = float(capacity.split()[0])
-            except:
-                pass
+        try:
+            cap_val = float(capacity.split()[0])
+        except (ValueError, IndexError, AttributeError):
+            cap_val = 1000.0
         
         new_id = create.add_vehicle_scoped(
             name=vehicle_name,
@@ -198,12 +190,10 @@ def update_vehicle(
     storage_type: str = "Dry"
 ):
     try:
-        cap_val = 1000
-        if capacity:
-            try:
-                cap_val = float(capacity.split()[0])
-            except:
-                pass
+        try:
+            cap_val = float(capacity.split()[0])
+        except (ValueError, IndexError, AttributeError):
+            cap_val = 1000.0
         
         update.update_vehicle_scoped(
             vehicle_id=vehicle_id,
@@ -239,9 +229,7 @@ def delete_vehicle(vehicle_id: int):
             return False, "Cannot delete vehicle: It is assigned to one or more routes."
         return False, str(e)
 
-# --------------------
-# Routes
-# --------------------
+# --- Routes ---
 
 def list_routes():
     scenarios = read.view_scenarios_scoped()
@@ -502,9 +490,7 @@ def export_routes_csv(details_list, output_handle):
 def export_route_detailed_csv(details, output_handle):
     scenario_management.export_trip_csv(details, output_handle)
 
-# --------------------
-# Products
-# --------------------
+# --- Products ---
 
 def list_products():
     rows = read.view_products_master_scoped()
@@ -553,14 +539,9 @@ def delete_product(product_code: str):
             return False, "Cannot delete product: It is present on one or more route manifests."
         return False, str(e)
 
-# --------------------
-# Route Products (Manifest)
-# --------------------
+# --- Route Products (Manifest) ---
 
 def get_route_manifest(route_id: int):
-    
-    # Reverting to direct fetch as requested to match mock data structure logic
-    # Fetch all items and filter (or could call get_trip_details per route)
     all_items = read.view_manifest_items_scoped()
     
     # We need to map item_name back to product_code so app.py can look up product details

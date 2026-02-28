@@ -32,4 +32,15 @@ BEGIN
     DELETE FROM users WHERE user_id = p_user_id AND tenant_id = p_tenant_id;
 END $$
 
+DROP PROCEDURE IF EXISTS get_user_by_username $$
+
+CREATE PROCEDURE get_user_by_username(
+    IN p_username VARCHAR(50)
+)
+BEGIN
+    SELECT user_id, tenant_id, password_hash, role
+    FROM users
+    WHERE username = p_username;
+END $$
+
 DELIMITER ;

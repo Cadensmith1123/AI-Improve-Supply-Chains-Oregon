@@ -7,23 +7,16 @@ from auth.passwords import hash_password
 
 @contextmanager
 def _get_db_context(conn=None):
-    """
-    Context manager to handle database connection lifecycle.
-    Uses provided connection or creates a new one.
-    Closes the connection only if it was created within this context.
-    """
     if conn:
         yield conn
-        return
-
-    conn = get_auth_db()
-    if conn is None:
-        raise RuntimeError("Failed to connect to user database")
-
-    try:
-        yield conn
-    finally:
-        conn.close()
+    else:
+        connection = get_auth_db()
+        if connection is None:
+            raise RuntimeError("Failed to connect to user database")
+        try:
+            yield connection
+        finally:
+            connection.close()
 
 
 def _execute_proc(proc_name: str, args: List[Any], conn=None) -> List[Dict[str, Any]]:
@@ -65,18 +58,15 @@ def _call_user_create_proc(proc_name: str, args: List[Any], conn=None) -> Option
     return new_id
 
 
-def create_user(username: str, password: str, email: str, tenant_id: int = 0, role: str = "User", conn=None) -> Optional[int]:
-    """
-    Creates a new user with a hashed password in the user database.
-    """
+def create_user(username: str, password: str, email: str, role: str = "User", conn=None) -> Optional[int]:
     if not username:
-        raise ValueError("username is required")
+        raise ValueError("Username is required")
     
-    # hash_password handles validation (not None, min length)
     hashed_pw = hash_password(password)
 
-    # args for add_user(p_tenant_id, p_username, p_password_hash, p_email, p_role)
-    args = [tenant_id or 0, username, hashed_pw, email, role]
+    # Proc signature: add_user(p_tenant_id, p_username, p_password_hash, p_email, p_role)
+    # Note: p_tenant_id is ignored by the proc in the current "User IS Tenant" model, passing 0.
+    args = [0, username, hashed_pw, email, role]
     
     return _call_user_create_proc("add_user", args, conn)
 
@@ -86,19 +76,11 @@ def delete_user(tenant_id: int, user_id: int, conn=None) -> List[Dict[str, Any]]
     Deletes a user by ID from the user database.
     """
     if user_id is None:
-        raise ValueError("user_id is required")
+        raise ValueError("User ID is required")
     
     return _execute_proc("delete_user", [tenant_id, user_id], conn)
 
 
 def get_user_by_username(username: str, conn=None) -> Optional[Dict[str, Any]]:
-    """
-    Retrieves a user record by username.
-    """
-    with _get_db_context(conn) as connection:
-        with closing(connection.cursor(dictionary=True)) as cur:
-            # Direct table access used here for simplicity; consider moving to a stored procedure (e.g., get_user_by_username)
-            # to maintain consistency with the stored procedure pattern used elsewhere.
-            query = "SELECT user_id, tenant_id, password_hash, role FROM users WHERE username = %s"
-            cur.execute(query, (username,))
-            return cur.fetchone()
+    rows = _execute_proc("get_user_by_username", [username], conn)
+    return rows[0] if rows else None

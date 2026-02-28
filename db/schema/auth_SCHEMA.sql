@@ -1,3 +1,4 @@
+DROP DATABASE IF EXISTS auth_db;
 CREATE DATABASE IF NOT EXISTS auth_db;
 USE auth_db;
 

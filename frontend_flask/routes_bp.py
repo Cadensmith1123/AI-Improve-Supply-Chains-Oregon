@@ -282,40 +282,10 @@ def route_load_add_post(route_id: int):
     if not route:
         abort(404)
 
-    errors = {}
-    product_raw = (request.form.get("product_id") or "").strip()
-    qty_raw = (request.form.get("quantity") or "").strip()
-    price_raw = (request.form.get("price_per_item") or "").strip()
-    items_per_unit_raw = (request.form.get("items_per_unit") or "").strip()
-    cost_raw = (request.form.get("cost_per_item") or "").strip()
-    weight_raw = (request.form.get("unit_weight") or "").strip()
-    volume_raw = (request.form.get("unit_volume") or "").strip()
+    data, errors = logic.validate_load_form(request.form)
 
-    product_id = None
-    quantity = None
-
-    if not product_raw:
-        errors["product_id"] = "Product is required."
-    else:
-        product_id = product_raw
-
-    if not qty_raw:
-        errors["quantity"] = "Quantity is required."
-    else:
-        try:
-            quantity = int(qty_raw)
-            if quantity <= 0:
-                errors["quantity"] = "Quantity must be greater than 0."
-        except ValueError:
-            errors["quantity"] = "Quantity must be a whole number."
-
-    price_per_item = logic.parse_optional_float(price_raw, "price_per_item", errors)
-    items_per_unit = logic.parse_optional_int(items_per_unit_raw, "items_per_unit", errors)
-    cost_per_item = logic.parse_optional_float(cost_raw, "cost_per_item", errors)
-    unit_weight = logic.parse_optional_float(weight_raw, "unit_weight", errors)
-    unit_volume = logic.parse_optional_float(volume_raw, "unit_volume", errors)
-
-    if product_id is not None and not db.get_product(product_id):
+    # DB Check (kept in BP as logic.py is pure)
+    if data["product_id"] is not None and not db.get_product(data["product_id"]):
         errors["product_id"] = "That product does not exist."
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -324,30 +294,27 @@ def route_load_add_post(route_id: int):
         if is_ajax:
             return jsonify({"success": False, "errors": errors}), 400
 
+        form_data = {k: request.form.get(k, "") for k in [
+            "product_id", "quantity", "price_per_item", 
+            "items_per_unit", "cost_per_item", "unit_weight", "unit_volume"
+        ]}
+
         ctx = _build_routes_page_context(
             open_modal="modal-manage-load",
             route_load_errors={route_id: errors},
-            route_load_form={route_id: {
-                "product_id": product_raw, 
-                "quantity": qty_raw, 
-                "price_per_item": price_raw, 
-                "items_per_unit": items_per_unit_raw,
-                "cost_per_item": cost_raw,
-                "unit_weight": weight_raw,
-                "unit_volume": volume_raw,
-            }},
+            route_load_form={route_id: form_data},
         )
         return render_template("routes_list.html", **ctx), 400
 
     ok, err = db.add_product_to_route(
         route_id=route_id, 
-        product_id=product_id, 
-        quantity=quantity,
-        price_per_item=price_per_item,
-        items_per_unit=items_per_unit,
-        cost_per_item=cost_per_item,
-        unit_weight=unit_weight,
-        unit_volume=unit_volume
+        product_id=data["product_id"], 
+        quantity=data["quantity"],
+        price_per_item=data["price_per_item"],
+        items_per_unit=data["items_per_unit"],
+        cost_per_item=data["cost_per_item"],
+        unit_weight=data["unit_weight"],
+        unit_volume=data["unit_volume"]
     )
     
     if is_ajax:

@@ -12,15 +12,14 @@ def login():
     password = data.get("password")
 
     if not username or not password:
-        return jsonify({"error": "username and password required"}), 400
+        return jsonify({"error": "Username and password required"}), 400
 
     user = get_user_by_username(username)
     
-    # Mitigate timing attacks: Always verify a hash, even if user is not found.
+    # Timing attack mitigation: Always verify a hash
     target_hash = user["password_hash"] if user else DUMMY_HASH
-    
-    if not verify_password(target_hash, password) or not user:
-        return jsonify({"error": "invalid credentials"}), 401
+    if not user or not verify_password(target_hash, password):
+        return jsonify({"error": "Invalid credentials"}), 401
 
     token = mint_access_token(user_id=user["user_id"], tenant_id=user["tenant_id"])
     return jsonify({"token": token})
@@ -36,8 +35,6 @@ def register():
         return jsonify({"error": "Username, email, and password are required."}), 400
 
     try:
-        # create_user handles hashing and DB insertion
-        # It returns the new user_id or raises ValueError if user exists
         user_id = create_user(username=username, password=password, email=email)
         
         if not user_id:
