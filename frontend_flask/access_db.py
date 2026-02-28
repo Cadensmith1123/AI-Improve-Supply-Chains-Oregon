@@ -1,24 +1,21 @@
-# access_db.py
 from flask import g
 from typing import Optional
-from db.functions.simple_functions import read, create, update, delete
+from db.functions.tennant_functions import (
+    scoped_read as read, 
+    scoped_create as create, 
+    scoped_update as update, 
+    scoped_delete as delete
+)
 from db.functions import scenario_management
-from decimal import Decimal
 
-# Helper to get tenant_id safely
 def _get_tenant_id():
-    try:
-        return g.tenant_id
-    except (RuntimeError, AttributeError):
-        return 1
+    """Helper to get tenant_id safely from Flask global context."""
+    return g.get('tenant_id', 1)
 
-# --------------------
-# Locations
-# --------------------
+# --- Locations ---
 
 def list_locations():
-    tid = _get_tenant_id()
-    return read.view_locations(tid)
+    return read.view_locations_scoped()
 
 def create_location(
     name: str, 
@@ -31,10 +28,8 @@ def create_location(
     avg_load_minutes: str = "30",
     avg_unload_minutes: str = "30"
 ):
-    tid = _get_tenant_id()
     try:
-        new_id = create.add_location(
-            tenant_id=tid,
+        new_id = create.add_location_scoped(
             name=name,
             type=loc_type,
             address_street=address,
@@ -63,10 +58,8 @@ def update_location(
     avg_load_minutes: str = "30",
     avg_unload_minutes: str = "30"
 ):
-    tid = _get_tenant_id()
     try:
-        update.update_location(
-            tenant_id=tid,
+        update.update_location_scoped(
             location_id=location_id,
             name=name,
             type=loc_type,
@@ -85,35 +78,28 @@ def update_location(
         return False, str(e)
 
 def delete_location(location_id: int):
-    tid = _get_tenant_id()
     try:
-        delete.delete_location(tid, location_id)
+        delete.delete_location_scoped(location_id=location_id)
         return True, None
     except Exception as e:
         if "foreign key constraint fails" in str(e).lower():
             return False, "Cannot delete location: It is used as an origin or destination in one or more routes."
         return False, str(e)
 
-# --------------------
-# Drivers
-# --------------------
+# --- Drivers ---
 
 def list_drivers():
-    tid = _get_tenant_id()
-    return read.view_drivers(tid)
+    return read.view_drivers_scoped()
 
 def get_driver(driver_id: int):
-    tid = _get_tenant_id()
-    rows = read.view_drivers(tid, ids=driver_id)
+    rows = read.view_drivers_scoped(ids=driver_id)
     if rows:
         return rows[0]
     return None
 
 def create_driver(name: str, hourly_drive_wage: str, hourly_load_wage: str):
-    tid = _get_tenant_id()
     try:
-        new_id = create.add_driver(
-            tenant_id=tid,
+        new_id = create.add_driver_scoped(
             name=name,
             hourly_drive_wage=float(hourly_drive_wage) if hourly_drive_wage else 0.0,
             hourly_load_wage=float(hourly_load_wage) if hourly_load_wage else 0.0
@@ -123,10 +109,8 @@ def create_driver(name: str, hourly_drive_wage: str, hourly_load_wage: str):
         return False, str(e), None
 
 def update_driver(driver_id: int, name: str, hourly_drive_wage: str, hourly_load_wage: str):
-    tid = _get_tenant_id()
     try:
-        update.update_driver(
-            tenant_id=tid,
+        update.update_driver_scoped(
             driver_id=driver_id,
             name=name,
             hourly_drive_wage=float(hourly_drive_wage) if hourly_drive_wage else 0.0,
@@ -137,29 +121,24 @@ def update_driver(driver_id: int, name: str, hourly_drive_wage: str, hourly_load
         return False, str(e)
 
 def delete_driver(driver_id: int):
-    tid = _get_tenant_id()
     try:
-        delete.delete_driver(tid, driver_id)
+        delete.delete_driver_scoped(driver_id=driver_id)
         return True, None
     except Exception as e:
         if "foreign key constraint fails" in str(e).lower():
             return False, "Cannot delete driver: They are assigned to one or more routes."
         return False, str(e)
 
-# --------------------
-# Vehicles
-# --------------------
+# --- Vehicles ---
 
 def list_vehicles():
-    tid = _get_tenant_id()
-    rows = read.view_vehicles(tid)
+    rows = read.view_vehicles_scoped()
     for r in rows:
         r['vehicle_name'] = r.get('name')
     return rows
 
 def get_vehicle(vehicle_id: int):
-    tid = _get_tenant_id()
-    rows = read.view_vehicles(tid, ids=vehicle_id)
+    rows = read.view_vehicles_scoped(ids=vehicle_id)
     if rows:
         rows[0]['vehicle_name'] = rows[0].get('name')
         return rows[0]
@@ -176,17 +155,13 @@ def create_vehicle(
     maintenance_cost: str = None,
     storage_type: str = "Dry"
 ):
-    tid = _get_tenant_id()
     try:
-        cap_val = 1000
-        if capacity:
-            try:
-                cap_val = float(capacity.split()[0])
-            except:
-                pass
+        try:
+            cap_val = float(capacity.split()[0])
+        except (ValueError, IndexError, AttributeError):
+            cap_val = 1000.0
         
-        new_id = create.add_vehicle(
-            tenant_id=tid,
+        new_id = create.add_vehicle_scoped(
             name=vehicle_name,
             mpg=float(mpg) if mpg else 10.0,
             purchase_price=float(purchase_price) if purchase_price else 0.0,
@@ -214,17 +189,13 @@ def update_vehicle(
     maintenance_cost: str = None,
     storage_type: str = "Dry"
 ):
-    tid = _get_tenant_id()
     try:
-        cap_val = 1000
-        if capacity:
-            try:
-                cap_val = float(capacity.split()[0])
-            except:
-                pass
+        try:
+            cap_val = float(capacity.split()[0])
+        except (ValueError, IndexError, AttributeError):
+            cap_val = 1000.0
         
-        update.update_vehicle(
-            tenant_id=tid,
+        update.update_vehicle_scoped(
             vehicle_id=vehicle_id,
             name=vehicle_name,
             mpg=float(mpg) if mpg else 10.0,
@@ -239,7 +210,8 @@ def update_vehicle(
         )
 
         # Refresh all routes (scenarios) that use this vehicle to update snapshots (depreciation, mpg, etc.)
-        scenarios = read.view_scenarios(tid)
+        tid = _get_tenant_id() # Needed for scenario_management
+        scenarios = read.view_scenarios_scoped()
         for s in scenarios:
             if s.get('vehicle_id') == vehicle_id:
                 scenario_management.refresh_scenario(tid, s.get('scenario_id'))
@@ -249,27 +221,23 @@ def update_vehicle(
         return False, str(e)
 
 def delete_vehicle(vehicle_id: int):
-    tid = _get_tenant_id()
     try:
-        delete.delete_vehicle(tid, vehicle_id)
+        delete.delete_vehicle_scoped(vehicle_id=vehicle_id)
         return True, None
     except Exception as e:
         if "foreign key constraint fails" in str(e).lower():
             return False, "Cannot delete vehicle: It is assigned to one or more routes."
         return False, str(e)
 
-# --------------------
-# Routes
-# --------------------
+# --- Routes ---
 
 def list_routes():
-    tid = _get_tenant_id()
-    scenarios = read.view_scenarios(tid)
+    scenarios = read.view_scenarios_scoped()
     if not scenarios:
         return []
     
     # Enrich with route definition names
-    all_routes = read.view_routes(tid)
+    all_routes = read.view_routes_scoped()
     routes_map = {r['route_id']: r for r in all_routes}
     
     out = []
@@ -308,17 +276,17 @@ def get_route(route_id: int):
     header = details['header']
     
     # Need origin/dest IDs from route definition
-    raw_scenarios = read.view_scenarios(tid, ids=route_id)
+    raw_scenarios = read.view_scenarios_scoped(ids=route_id)
     if not raw_scenarios:
         return None
     raw_s = raw_scenarios[0]
     real_route_id = raw_s.get('route_id')
     
-    raw_routes = read.view_routes(tid, ids=real_route_id)
+    raw_routes = read.view_routes_scoped(ids=real_route_id)
     raw_r = raw_routes[0] if raw_routes else {}
     
-    start_location = read.view_locations(tid, ids=raw_r.get('origin_location_id'))[0]
-    dest_location = read.view_locations(tid, ids=raw_r.get('dest_location_id'))[0]
+    start_location = read.view_locations_scoped(ids=raw_r.get('origin_location_id'))[0]
+    dest_location = read.view_locations_scoped(ids=raw_r.get('dest_location_id'))[0]
     start_address = f"{start_location.get('address_street')} {start_location.get('city')} {start_location.get('state')}"
     dest_address = f"{dest_location.get('address_street')} {dest_location.get('city')} {dest_location.get('state')}" 
 
@@ -399,8 +367,7 @@ def create_route(
     tid = _get_tenant_id()
     try:
         # 1. Create Route Definition
-        real_route_id = create.add_route(
-            tenant_id=tid,
+        real_route_id = create.add_route_scoped(
             name=name,
             origin_location_id=origin_location_id,
             dest_location_id=dest_location_id
@@ -448,11 +415,10 @@ def update_route(
         )
         
         # Update Route Definition
-        raw_scenarios = read.view_scenarios(tid, ids=route_id)
+        raw_scenarios = read.view_scenarios_scoped(ids=route_id)
         if raw_scenarios:
             real_route_id = raw_scenarios[0].get('route_id')
-            update.update_route(
-                tenant_id=tid,
+            update.update_route_scoped(
                 route_id=real_route_id,
                 name=name,
                 origin_location_id=origin_location_id,
@@ -467,7 +433,7 @@ def delete_route(route_id: int):
     tid = _get_tenant_id()
     try:
         # route_id here refers to the scenario_id
-        delete.delete_plan(tid, route_id)
+        delete.delete_plan_scoped(scenario_id=route_id)
         return True, None
     except Exception as e:
         # Manifest items usually cascade, but if there are other constraints:
@@ -507,7 +473,7 @@ def recalculate_route_costs(route_id: int):
 
 def get_all_routes_raw():
     tid = _get_tenant_id()
-    scenarios = read.view_scenarios(tid)
+    scenarios = read.view_scenarios_scoped()
     out = []
     for s in scenarios:
         d = scenario_management.get_trip_details(tid, s['scenario_id'])
@@ -524,21 +490,17 @@ def export_routes_csv(details_list, output_handle):
 def export_route_detailed_csv(details, output_handle):
     scenario_management.export_trip_csv(details, output_handle)
 
-# --------------------
-# Products
-# --------------------
+# --- Products ---
 
 def list_products():
-    tid = _get_tenant_id()
-    rows = read.view_products_master(tid)
+    rows = read.view_products_master_scoped()
     for r in rows:
         r['product_name'] = r.get('name')
         r['product_id'] = r.get('product_code')
     return rows
 
 def get_product(product_id):
-    tid = _get_tenant_id()
-    rows = read.view_products_master(tid, ids=product_id)
+    rows = read.view_products_master_scoped(ids=product_id)
     if rows:
         rows[0]['product_name'] = rows[0].get('name')
         rows[0]['product_id'] = rows[0].get('product_code')
@@ -546,11 +508,9 @@ def get_product(product_id):
     return None
 
 def create_product(product_name: str, sku: str, storage_type: str):
-    tid = _get_tenant_id()
     try:
         # Using sku as product_code
-        new_id = create.add_product_master(
-            tenant_id=tid,
+        new_id = create.add_product_master_scoped(
             product_code=sku,
             name=product_name,
             storage_type=storage_type if storage_type else "Dry"
@@ -560,10 +520,8 @@ def create_product(product_name: str, sku: str, storage_type: str):
         return False, str(e), None
 
 def update_product(product_id: str, product_name: str, storage_type: str):
-    tid = _get_tenant_id()
     try:
-        update.update_product_master(
-            tenant_id=tid,
+        update.update_product_master_scoped(
             product_code=product_id,
             name=product_name,
             storage_type=storage_type if storage_type else "Dry"
@@ -573,28 +531,21 @@ def update_product(product_id: str, product_name: str, storage_type: str):
         return False, str(e)
 
 def delete_product(product_code: str):
-    tid = _get_tenant_id()
     try:
-        delete.delete_product_master(tid, product_code)
+        delete.delete_product_master_scoped(product_code=product_code)
         return True, None
     except Exception as e:
         if "foreign key constraint fails" in str(e).lower():
             return False, "Cannot delete product: It is present on one or more route manifests."
         return False, str(e)
 
-# --------------------
-# Route Products (Manifest)
-# --------------------
+# --- Route Products (Manifest) ---
 
 def get_route_manifest(route_id: int):
-    tid = _get_tenant_id()
-    
-    # Reverting to direct fetch as requested to match mock data structure logic
-    # Fetch all items and filter (or could call get_trip_details per route)
-    all_items = read.view_manifest_items(tid)
+    all_items = read.view_manifest_items_scoped()
     
     # We need to map item_name back to product_code so app.py can look up product details
-    all_products = read.view_products_master(tid)
+    all_products = read.view_products_master_scoped()
     name_to_code = {p['name']: p['product_code'] for p in all_products}
     
     out = []
@@ -607,20 +558,24 @@ def get_route_manifest(route_id: int):
         p_id = name_to_code.get(item_name, item_name)
         
         out.append({
+            "manifest_item_id": i.get('manifest_item_id'),
             "product_id": p_id, 
             "product_name": item_name,
-            "quantity": i.get('quantity_loaded'),
+            "quantity": float(i.get('quantity_loaded') or 0),
             "unit_price": i.get('snapshot_price_per_item'),
-            "items_per_unit": i.get('snapshot_items_per_unit')
+            "items_per_unit": float(i.get('snapshot_items_per_unit') or 0),
+            "cost_per_item": i.get('snapshot_cost_per_item'),
+            "unit_weight": i.get('snapshot_unit_weight'),
+            "unit_volume": i.get('snapshot_unit_volume')
         })
     return out
 
 def add_product_to_route(
     route_id: int, 
     product_id, 
-    quantity: int, 
+    quantity: float, 
     price_per_item: Optional[float] = None, 
-    items_per_unit: Optional[int] = None,
+    items_per_unit: Optional[float] = None,
     cost_per_item: Optional[float] = None,
     unit_weight: Optional[float] = None,
     unit_volume: Optional[float] = None):
@@ -629,29 +584,49 @@ def add_product_to_route(
     if not prod:
         return False, "Product not found"
     
-    try:
-        scenario_management.add_manifest_items(
-            tenant_id=tid,
-            scenario_id=route_id,
-            item_name=prod['name'],
-            quantity_loaded=quantity,
-            cost_per_item=cost_per_item,
-            price_per_item=price_per_item,
-            items_per_unit=items_per_unit,
-            unit_weight_lbs=unit_weight,
-            unit_volume=unit_volume
-        )
-        return True, None
-    except Exception as e:
-        return False, str(e)
+    # Check if item already exists on this route
+    manifest = get_route_manifest(route_id)
+    existing_item = next((i for i in manifest if str(i['product_id']) == str(product_id)), None)
+
+    if existing_item:
+        try:
+            update.update_manifest_item_scoped(
+                manifest_item_id=existing_item['manifest_item_id'],
+                scenario_id=route_id,
+                item_name=prod['name'],
+                quantity_loaded=quantity,
+                snapshot_cost_per_item=cost_per_item,
+                snapshot_items_per_unit=items_per_unit,
+                snapshot_unit_weight=unit_weight,
+                snapshot_unit_volume=unit_volume,
+                snapshot_price_per_item=price_per_item
+            )
+            return True, None
+        except Exception as e:
+            return False, str(e)
+    else:
+        try:
+            scenario_management.add_manifest_items(
+                tenant_id=tid,
+                scenario_id=route_id,
+                item_name=prod['name'],
+                quantity_loaded=quantity,
+                cost_per_item=cost_per_item,
+                price_per_item=price_per_item,
+                items_per_unit=items_per_unit,
+                unit_weight_lbs=unit_weight,
+                unit_volume=unit_volume
+            )
+            return True, None
+        except Exception as e:
+            return False, str(e)
 
 def remove_product_from_route(route_id: int, product_id):
-    tid = _get_tenant_id()
     # product_id passed from app.py is now product_code (mapped in get_route_manifest)
     target_code = str(product_id)
     
     # Resolve code to name to find the manifest item
-    all_products = read.view_products_master(tid)
+    all_products = read.view_products_master_scoped()
     target_name = None
     for p in all_products:
         if str(p['product_code']) == target_code:
@@ -661,7 +636,7 @@ def remove_product_from_route(route_id: int, product_id):
     if not target_name:
         target_name = target_code
     
-    all_items = read.view_manifest_items(tid)
+    all_items = read.view_manifest_items_scoped()
     item_to_delete = None
     
     for item in all_items:
@@ -672,7 +647,7 @@ def remove_product_from_route(route_id: int, product_id):
     
     if item_to_delete:
         try:
-            delete.delete_manifest_item(tid, item_to_delete)
+            delete.delete_manifest_item_scoped(manifest_item_id=item_to_delete)
             return True, None
         except Exception as e:
             return False, str(e)

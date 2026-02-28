@@ -121,7 +121,7 @@ CREATE PROCEDURE update_supply(
     IN p_quantity_available DECIMAL(10,2),
     IN p_unit_weight_lbs DECIMAL(8,2),
     IN p_unit_volume_cu_ft DECIMAL(8,2),
-    IN p_items_per_handling_unit INT,
+    IN p_items_per_handling_unit DECIMAL(10,2),
     IN p_cost_per_item DECIMAL(10,2)
 )
 BEGIN
@@ -224,10 +224,12 @@ CREATE PROCEDURE update_manifest_item(
     IN p_scenario_id INT,
     IN p_supply_id INT,
     IN p_demand_id INT,
+    IN p_item_name VARCHAR(100),
     IN p_quantity_loaded DECIMAL(10,2),
     IN p_snapshot_cost_per_item DECIMAL(10,2),
-    IN p_snapshot_items_per_unit INT,
+    IN p_snapshot_items_per_unit DECIMAL(10,2),
     IN p_snapshot_unit_weight DECIMAL(8,2),
+    IN p_snapshot_unit_volume DECIMAL(10,2),
     IN p_snapshot_price_per_item DECIMAL(10,2)
 )
 BEGIN
@@ -236,10 +238,12 @@ BEGIN
         scenario_id = p_scenario_id,
         supply_id = p_supply_id,
         demand_id = p_demand_id,
+        item_name = p_item_name,
         quantity_loaded = p_quantity_loaded,
         snapshot_cost_per_item = p_snapshot_cost_per_item,
         snapshot_items_per_unit = p_snapshot_items_per_unit,
         snapshot_unit_weight = p_snapshot_unit_weight,
+        snapshot_unit_volume = p_snapshot_unit_volume,
         snapshot_price_per_item = p_snapshot_price_per_item
     WHERE manifest_item_id = p_manifest_item_id AND tenant_id = p_tenant_id;
 END $$

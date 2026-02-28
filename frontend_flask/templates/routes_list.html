@@ -311,10 +311,23 @@
         tr.innerHTML = `
           <td style="font-weight:900;">${item.product_name}</td>
           <td>${item.quantity}</td>
+          <td>${item.items_per_unit || 1}</td>
+          <td>${item.unit_price ? '$'+parseFloat(item.unit_price).toFixed(2) : '-'}</td>
           <td>
-            <button class="btn small remove-item-btn" type="button" 
-              data-route-id="${routeId}" 
-              data-product-id="${item.product_id}">Remove</button>
+            <div style="display:flex; gap:6px; justify-content:flex-end;">
+              <button class="btn small edit-item-btn" type="button"
+                data-product-id="${item.product_id}"
+                data-qty="${item.quantity}"
+                data-items="${item.items_per_unit||''}"
+                data-price="${item.unit_price||''}"
+                data-cost="${item.cost_per_item||''}"
+                data-weight="${item.unit_weight||''}"
+                data-volume="${item.unit_volume||''}"
+              >Edit</button>
+              <button class="btn small remove-item-btn" type="button" 
+                data-route-id="${routeId}" 
+                data-product-id="${item.product_id}">Remove</button>
+            </div>
           </td>
         `;
         tbody.appendChild(tr);
@@ -393,8 +406,20 @@
       }
     });
 
-    // Handle "Remove" button clicks via AJAX (Delegated event)
+    // Handle "Edit" and "Remove" button clicks via AJAX (Delegated event)
     document.getElementById("manifestBody").addEventListener("click", async (e) => {
+      if (e.target.classList.contains("edit-item-btn")) {
+        const btn = e.target;
+        document.getElementById("loadProductSelect").value = btn.dataset.productId;
+        document.getElementById("loadQtyInput").value = btn.dataset.qty;
+        document.getElementById("loadItemsPerUnitInput").value = btn.dataset.items;
+        document.getElementById("loadPriceInput").value = btn.dataset.price;
+        document.getElementById("loadCostInput").value = btn.dataset.cost;
+        document.getElementById("loadWeightInput").value = btn.dataset.weight;
+        document.getElementById("loadVolumeInput").value = btn.dataset.volume;
+        return;
+      }
+
       if (e.target.classList.contains("remove-item-btn")) {
         const btn = e.target;
         const routeId = btn.dataset.routeId;

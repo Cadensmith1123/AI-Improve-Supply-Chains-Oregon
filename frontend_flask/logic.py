@@ -126,6 +126,46 @@ def validate_product_form(form):
     return data, errors
 
 
+def validate_load_form(form):
+    errors = {}
+    product_raw = (form.get("product_id") or "").strip()
+    qty_raw = (form.get("quantity") or "").strip()
+    price_raw = (form.get("price_per_item") or "").strip()
+    items_per_unit_raw = (form.get("items_per_unit") or "").strip()
+    cost_raw = (form.get("cost_per_item") or "").strip()
+    weight_raw = (form.get("unit_weight") or "").strip()
+    volume_raw = (form.get("unit_volume") or "").strip()
+
+    product_id = None
+    quantity = None
+
+    if not product_raw:
+        errors["product_id"] = "Product is required."
+    else:
+        product_id = product_raw
+
+    if not qty_raw:
+        errors["quantity"] = "Quantity is required."
+    else:
+        try:
+            quantity = float(qty_raw)
+            if quantity <= 0:
+                errors["quantity"] = "Quantity must be greater than 0."
+        except ValueError:
+            errors["quantity"] = "Quantity must be a number."
+
+    data = {
+        "product_id": product_id,
+        "quantity": quantity,
+        "price_per_item": parse_optional_float(price_raw, "price_per_item", errors),
+        "items_per_unit": parse_optional_float(items_per_unit_raw, "items_per_unit", errors),
+        "cost_per_item": parse_optional_float(cost_raw, "cost_per_item", errors),
+        "unit_weight": parse_optional_float(weight_raw, "unit_weight", errors),
+        "unit_volume": parse_optional_float(volume_raw, "unit_volume", errors),
+    }
+    return data, errors
+
+
 def calculate_route_cost(route):
     total_cost = 0.0
     for k in ["driver_cost", "load_cost", "unload_cost", "fuel_cost", "depreciation_cost", "insurance_cost"]:
@@ -145,14 +185,14 @@ def calculate_manifest_item_metrics(item, product=None):
         unit_price_f = 0.0
 
     try:
-        qty = int(item.get("quantity", 0))
+        qty = float(item.get("quantity", 0))
     except (TypeError, ValueError):
         qty = 0
 
     try:
-        items_per_unit = int(item.get("items_per_unit") or 1)
+        items_per_unit = float(item.get("items_per_unit") or 1)
     except (TypeError, ValueError):
-        items_per_unit = 1
+        items_per_unit = 1.0
 
     line_total = unit_price_f * qty * items_per_unit
     

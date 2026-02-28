@@ -84,7 +84,7 @@ CREATE TABLE supply (
     quantity_available DECIMAL(10, 2) NOT NULL,
     unit_weight_lbs DECIMAL(10, 2) DEFAULT 0.00,
     unit_volume_cu_ft DECIMAL(10, 2) DEFAULT 0.00,
-    items_per_handling_unit INT DEFAULT 1,
+    items_per_handling_unit DECIMAL(10, 2) DEFAULT 1.00,
     cost_per_item DECIMAL(10, 2) DEFAULT 0.00,
 
     PRIMARY KEY (tenant_id, supply_id),
@@ -167,7 +167,7 @@ CREATE TABLE manifest_items (
     
     -- Snapshots
     snapshot_cost_per_item DECIMAL(10, 2),
-    snapshot_items_per_unit INT,
+    snapshot_items_per_unit DECIMAL(10, 2),
     snapshot_unit_weight DECIMAL(10, 2),
     snapshot_unit_volume DECIMAL(10, 2),
     snapshot_price_per_item DECIMAL(10, 2),

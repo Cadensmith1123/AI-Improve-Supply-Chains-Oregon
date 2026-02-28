@@ -94,7 +94,7 @@ CREATE PROCEDURE add_supply(
     IN p_qty DECIMAL(10,2),
     IN p_weight DECIMAL(10,2),
     IN p_volume DECIMAL(10,2),
-    IN p_items_unit INT,
+    IN p_items_unit DECIMAL(10,2),
     IN p_cost DECIMAL(10,2)
 )
 BEGIN
@@ -142,7 +142,7 @@ CREATE PROCEDURE add_manifest_item(
     IN p_item_name VARCHAR(100),
     IN p_quantity_loaded DECIMAL(10,2),
     IN p_cost DECIMAL(10,2),
-    IN p_items_per_unit INT,
+    IN p_items_per_unit DECIMAL(10,2),
     IN p_unit_weight DECIMAL(10,2),
     IN p_unit_volume DECIMAL(10,2),
     IN p_price DECIMAL(10,2)

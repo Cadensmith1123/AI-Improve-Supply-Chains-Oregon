@@ -14,6 +14,15 @@ db_config = {
 
 }
 
+auth_db_config = {
+    "user": os.getenv("AUTH_DB_USER"),
+    "password": os.getenv("AUTH_DB_PASSWORD"),
+    "host": os.getenv("AUTH_DB_HOST"),
+    "port": os.getenv("AUTH_DB_PORT"),
+    "database": os.getenv("AUTH_DB_NAME"),
+    "connection_timeout": 10
+}
+
 
 def get_db():
     try:
@@ -24,32 +33,10 @@ def get_db():
         return None
 
 
-def execute_creation_proc(proc_name, args, conn=None):
-    """
-    Executes a stored procedure that inserts a record and returns its new ID.
-    Handles connection lifecycle (opens/closes if conn is None).
-    """
-    should_close = False
-    if conn is None:
-        conn = get_db()
-        should_close = True
-    
-    if conn is None:
-        raise RuntimeError("Failed to connect to database")
-
-    new_id = None
+def get_auth_db():
     try:
-        cur = conn.cursor()
-        cur.callproc(proc_name, args)
-
-        for r in cur.stored_results():
-            row = r.fetchone()
-            if row:
-                new_id = row[0]
-        conn.commit()
-        cur.close()
-    finally:
-        if should_close and conn:
-            conn.close()
-
-    return new_id
+        return mysql.connector.connect(**auth_db_config)
+    except Exception as e:
+        # Security: Don't print full exception as it may contain credentials
+        print(f"User DB Connection Error: {type(e).__name__}")
+        return None
