@@ -28,7 +28,7 @@ def get_db_connection():
         password=os.getenv("DB_PASSWORD"),
         host=os.getenv("DB_HOST"),
         port=os.getenv("DB_PORT"),
-        database=os.getenv("DB_NAME", "local_food_db") # Default to local_food_db if not set
+        database=os.getenv("DB_NAME") # Default to local_food_db if not set
     )
 
 def execute_sql_file(conn, file_path):
