@@ -1,5 +1,6 @@
 from decimal import Decimal
 import pandas as pd
+import depreciation_insurance
 
 def parse_optional_float(raw: str, field_key: str, errors: dict):
     raw = (raw or "").strip()
@@ -214,11 +215,13 @@ def get_trip_length():
     return miles_est, time_est
 
 def calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles):
-    rate = Decimal("3.000")
-    return rate * to_decimal(trip_miles)
+    depreciation_cost = depreciation_insurance.trip_depreciation_cost(
+        purchase_price, salvage_value, yearly_mileage, trip_miles
+    )
+    return depreciation_cost
 
-def calculate_insurance(annual_insurance_cost):
-    return Decimal(5.00)
+def calculate_insurance(annual_insurance_cost, yearly_mileage, trip_miles):
+    insurance_cost = depreciation_insurance.trip_insurance_cost(annual_insurance_cost, yearly_mileage, trip_miles)
 
 def calculate_maintenance(annual_maintenance_cost, yearly_mileage, trip_miles):
     return Decimal(3.5)
@@ -239,7 +242,7 @@ def calculate_operating_costs(vehicle, trip_miles):
     annual_maintenance = vehicle.get('annual_maintenance_cost')
 
     dep = calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles)
-    ins = calculate_insurance(annual_insurance)
+    ins = calculate_insurance(annual_insurance, yearly_mileage, trip_miles)
     maint = calculate_maintenance(annual_maintenance, yearly_mileage, trip_miles)
     
     return dep, ins, maint
