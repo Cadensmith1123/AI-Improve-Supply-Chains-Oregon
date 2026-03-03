@@ -222,9 +222,12 @@ def calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_m
 
 def calculate_insurance(annual_insurance_cost, yearly_mileage, trip_miles):
     insurance_cost = depreciation_insurance.trip_insurance_cost(annual_insurance_cost, yearly_mileage, trip_miles)
+    return insurance_cost
+
 
 def calculate_maintenance(annual_maintenance_cost, yearly_mileage, trip_miles):
-    return Decimal(3.5)
+    # Maintenance is calculated same as insurance (Annual / Yearly Miles * Trip Miles)
+    return depreciation_insurance.trip_insurance_cost(annual_maintenance_cost, yearly_mileage, trip_miles)
 
 def calculate_operating_costs(vehicle, trip_miles):
     """
@@ -235,9 +238,9 @@ def calculate_operating_costs(vehicle, trip_miles):
         return Decimal("0.0"), Decimal("0.0"), Decimal("0.0")
     
     # Extract values safely
-    purchase_price = vehicle.get('purchase_price')
-    salvage_value = vehicle.get('salvage_value')
-    yearly_mileage = vehicle.get('yearly_mileage')
+    purchase_price = vehicle.get('vehicle_purchase_price')
+    salvage_value = vehicle.get('vehicle_estimated_salvage_value')
+    yearly_mileage = vehicle.get('vehicle_estimated_yearly_milage')
     annual_insurance = vehicle.get('annual_insurance_cost')
     annual_maintenance = vehicle.get('annual_maintenance_cost')
 
