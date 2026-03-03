@@ -1,9 +1,16 @@
 from db.functions.connect import get_db
 from db.functions.simple_functions import read, create
-from decimal import Decimal #used to combat floating point errors
+from decimal import Decimal, ROUND_HALF_UP  # keep Decimal for DB and currency correctness
 import pandas as pd
 from datetime import date
 
+from frontend_flask.depreciation_insurance import (
+    depreciation_cost_per_mile,
+    insurance_cost_per_mile,
+)
+
+
+USEFUL_LIFE_YEARS = 8.0  # Policy: total projected mileage is based on 8 years of use, can be adjusted as needed
 
 def get_locations(tenant_id, conn=None):
     location_data = read.view_locations(tenant_id, conn=conn, columns=['location_id', 'name'])
@@ -18,32 +25,39 @@ def _to_dec(x):
     return Decimal(str(x)) if x not in (None, "") else None
 
 
-def calculate_depreciation(purchase_price, salvage_value, yearly_mileage):
-    return Decimal("3.000")
+def _to_float_strict(x) -> float:
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return 0.0
 
+
+def _safe_dec(val, default="0"):
+    return Decimal(str(val)) if val is not None else Decimal(default)
+
+def calculate_depreciation(purchase_price, salvage_value, yearly_mileage) -> Decimal:
+    ym = _to_float_strict(yearly_mileage)
+    total_projected_mileage = ym * USEFUL_LIFE_YEARS if ym > 0 else 0.0
+
+    dppm = depreciation_cost_per_mile(
+        purchase_price=purchase_price,
+        salvage_value=salvage_value,
+        total_projected_mileage=total_projected_mileage,
+    )
+
+    return Decimal(str(dppm)).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
 
 def create_scenario(
         tenant_id,
         route_id,
         total_revenue,
-        vehicle_id = None,
-        driver_id = None,
-        run_date = None,
-        current_gas_price = None,
-        conn = None
+        vehicle_id=None,
+        driver_id=None,
+        run_date=None,
+        current_gas_price=None,
+        conn=None
         ):
-    """
-    Creates new scenario header can take string int or float as inputs. 
-    
-    :param route_id: route ID (required)
-    :param total_revenue: total revenue (required)
-    :param vehicle_id: vehicle id (optional)
-    :param driver_id: driver id (optional)
-    :param run_date: run date (optional defaults to current date)
-    :param current_gas_price: gas price (optional)
 
-    Returns the ID of the newly created scenario. 
-    """
     if route_id is None:
         raise ValueError("route_id is required")
     if total_revenue is None:
@@ -67,14 +81,16 @@ def create_scenario(
         if v_rows:
             v = v_rows[0]
             depreciation = calculate_depreciation(
-                v.get('vehicle_purchase_price'), v.get('vehicle_estimated_salvage_value'), v.get('vehicle_estimated_yearly_milage')
+                v.get('vehicle_purchase_price'),
+                v.get('vehicle_estimated_salvage_value'),
+                v.get('vehicle_estimated_yearly_milage')  
             )
 
     should_close = False
     if conn is None:
         conn = get_db()
         should_close = True
-    
+
     if conn is None:
         raise RuntimeError("Failed to connect to database")
 
@@ -89,7 +105,7 @@ def create_scenario(
             run_date,
             current_gas_price,
             total_revenue,
-            depreciation,
+            depreciation,  
             0
         ]
         result = cur.callproc("create_trip_header", args)
@@ -115,33 +131,24 @@ def update_scenario(
     current_gas_price=None,
     conn=None
 ):
-    """
-    Docstring for update_scenario
-    
-    :param scenario_id: Scenario id (required)
-    :param route_id: Route id (optional)
-    :param total_revenue: total_revenue (optional)
-    :param vehicle_id: vehicle id (optional)
-    :param driver_id: driver id (optional)
-    :param run_date: run date (optional)
-    :param current_gas_price: gas price (optional)
-    """
+
     should_close = False
     if conn is None:
         conn = get_db()
         should_close = True
-    
+
     if conn is None:
         raise RuntimeError("Failed to connect to database")
 
-    # Calculate depreciation if vehicle is being updated
     depreciation = None
     if vehicle_id is not None:
         v_rows = read.view_vehicles(tenant_id, conn=conn, ids=vehicle_id)
         if v_rows:
             v = v_rows[0]
             depreciation = calculate_depreciation(
-                v.get('vehicle_purchase_price'), v.get('vehicle_estimated_salvage_value'), v.get('vehicle_estimated_yearly_milage')
+                v.get('vehicle_purchase_price'),
+                v.get('vehicle_estimated_salvage_value'),
+                v.get('vehicle_estimated_yearly_milage') 
             )
 
     try:
@@ -173,38 +180,34 @@ def update_scenario(
 
 
 def refresh_scenario(tenant_id, scenario_id, conn=None):
-    """
-    Forces a refresh of snapshot values in the scenario header based on current master data.
-    """
+
     should_close = False
     if conn is None:
         conn = get_db()
         should_close = True
-    
+
     if conn is None:
         raise RuntimeError("Failed to connect to database")
 
     try:
-        # 1. Get current vehicle ID to calculate depreciation
         scenarios = read.view_scenarios(tenant_id, ids=scenario_id, conn=conn)
         if not scenarios:
             return False
-        
+
         scenario = scenarios[0]
         vehicle_id = scenario.get('vehicle_id')
-        
+
         depreciation = Decimal("0.000")
         if vehicle_id:
             v_rows = read.view_vehicles(tenant_id, ids=vehicle_id, conn=conn)
             if v_rows:
                 v = v_rows[0]
                 depreciation = calculate_depreciation(
-                    v.get('vehicle_purchase_price'), 
-                    v.get('vehicle_estimated_salvage_value'), 
-                    v.get('vehicle_estimated_yearly_milage')
+                    v.get('vehicle_purchase_price'),
+                    v.get('vehicle_estimated_salvage_value'),
+                    v.get('vehicle_estimated_yearly_milage') 
                 )
 
-        # 2. Call stored procedure
         cur = conn.cursor()
         cur.callproc("refresh_trip_snapshots", [tenant_id, scenario_id, depreciation])
         conn.commit()
@@ -214,34 +217,21 @@ def refresh_scenario(tenant_id, scenario_id, conn=None):
         if should_close and conn:
             conn.close()
 
-
 def add_manifest_items(
         tenant_id,
         scenario_id,
         item_name,
         quantity_loaded,
-        supply_id = None,
-        demand_id = None,
-        cost_per_item = None,
-        items_per_unit = None,
-        unit_weight_lbs = None,
-        unit_volume = None,
-        price_per_item = None,
-        conn = None
+        supply_id=None,
+        demand_id=None,
+        cost_per_item=None,
+        items_per_unit=None,
+        unit_weight_lbs=None,
+        unit_volume=None,
+        price_per_item=None,
+        conn=None
 ):
-    """
-    adds a product to the trip manifest
-    
-    :param scenario_id: scenario id (required)
-    :param item_name: name of item (required)
-    :param quantity_loaded: quantity loaded (handling units, required)
-    :param supply_id: supply id (optional)
-    :param demand_id: demand id (optional)
-    :param cost_per_item: cost per item (optional)
-    :param items_per_unit: items per handling unit (optional)
-    :param unit_weight_lbs: weight per handling unit (optional)
-    :param price_per_item: sale price per item (optional)
-    """
+
     return create.add_manifest_item(
         tenant_id=tenant_id,
         scenario_id=scenario_id,
@@ -258,11 +248,6 @@ def add_manifest_items(
     )
 
 
-def _safe_dec(val, default="0"):
-    """Helper to safely convert values to Decimal, handling None."""
-    return Decimal(str(val)) if val is not None else Decimal(default)
-
-
 def _calculate_line_metrics(row):
     """
     Pure function: Calculates extended totals (weight, volume, COGS, revenue) 
@@ -270,8 +255,6 @@ def _calculate_line_metrics(row):
     """
     qty = _safe_dec(row.get("quantity_loaded"))
     items_per_unit = _safe_dec(row.get("items_per_unit"), "1")
-    
-    # Standardized on unit_weight_lbs for both DB and Input
     unit_weight = _safe_dec(row.get("unit_weight_lbs"))
     unit_volume = _safe_dec(row.get("unit_volume"))
     cost = _safe_dec(row.get("cost_per_item"))
@@ -286,7 +269,6 @@ def _calculate_line_metrics(row):
 
 
 def _aggregate_totals(items, entered_revenue):
-    """Pure function: Sums up calculated line items to create scenario totals."""
     return {
         "line_item_count": len(items),
         "total_weight_lbs": sum((i["total_line_weight_lbs"] for i in items), Decimal(0)),
@@ -298,21 +280,14 @@ def _aggregate_totals(items, entered_revenue):
 
 
 def calculate_scenario_metrics(items, entered_revenue=0):
-    """
-    Calculates totals for a list of items (e.g. from UI input or DB) 
-    without requiring database interaction.
-    """
     processed_items = []
     for item in items:
-        # Calculate metrics using the shared logic
         metrics = _calculate_line_metrics(item)
-        # Merge metrics back into the item
         processed_item = {**item, **metrics}
         processed_items.append(processed_item)
 
     totals = _aggregate_totals(processed_items, entered_revenue)
     return {"items": processed_items, "totals": totals}
-
 
 def get_trip_details(tenant_id, scenario_id, conn=None):
     if scenario_id in (None, ""):
@@ -323,7 +298,7 @@ def get_trip_details(tenant_id, scenario_id, conn=None):
     if conn is None:
         conn = get_db()
         should_close = True
-    
+
     if conn is None:
         raise RuntimeError("Failed to connect to database")
 
@@ -332,7 +307,6 @@ def get_trip_details(tenant_id, scenario_id, conn=None):
 
         cur.callproc("get_trip_details", [tenant_id, scenario_id])
 
-        # Only expecting one result set now (raw joined data)
         result_sets = [r.fetchall() for r in cur.stored_results()]
         cur.close()
     finally:
@@ -355,7 +329,7 @@ def get_trip_details(tenant_id, scenario_id, conn=None):
         "vehicle_mpg",
         "gas_price",
         "depreciation_per_mile",
-        "daily_insurance",
+        "daily_insurance",          
         "daily_maintenance_cost",
         "entered_revenue",
         "plan_load_min",
@@ -364,6 +338,21 @@ def get_trip_details(tenant_id, scenario_id, conn=None):
 
     first = rows[0]
     header = {k: first.get(k) for k in header_cols}
+
+    try:
+        scenarios_for_vehicle = read.view_scenarios(tenant_id, ids=scenario_id)
+        if scenarios_for_vehicle:
+            vehicle_id = scenarios_for_vehicle[0].get('vehicle_id')
+            if vehicle_id:
+                vrows = read.view_vehicles(tenant_id, ids=vehicle_id)
+                if vrows:
+                    v = vrows[0]
+                    annual_ins_cost = v.get('annual_insurance_cost')             
+                    yearly_mileage = v.get('vehicle_estimated_yearly_milage')    
+                    icpm = insurance_cost_per_mile(annual_ins_cost, yearly_mileage)
+                    header["daily_insurance"] = icpm  
+    except Exception:
+        pass
 
     item_cols = [
         "product_name",
@@ -379,19 +368,16 @@ def get_trip_details(tenant_id, scenario_id, conn=None):
     for row in rows:
         if row.get("product_name") is None and row.get("quantity_loaded") is None:
             continue
-        
-        # 1. Extract basic data (only keys that exist in the raw row)
+
         item_data = {k: row.get(k) for k in item_cols if k in row}
-        
-        # 2. Apply business logic for line totals
+
         metrics = _calculate_line_metrics(row)
         item_data.update(metrics)
-        
+
         items.append(item_data)
 
-    # 3. Apply business logic for aggregation
     totals = _aggregate_totals(items, header.get("entered_revenue"))
-    
+
     return {"header": header, "items": items, "totals": totals}
 
 
@@ -403,10 +389,11 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
     # Snapshot inputs
     drive_rate = float(header.get("driver_drive_rate") or 0)
     load_rate = float(header.get("driver_load_rate") or 0)
-    daily_ins = float(header.get("daily_insurance") or 0)
-    depreciation_rate = float(header.get("depreciation_per_mile") or 0)
+
+    # Interpret "daily_insurance" header value as INSURANCE PER MILE (by design above)
+    insurance_per_mile = float(header.get("daily_insurance") or 0.0)
     daily_maintenance_cost = float(header.get("daily_maintenance_cost") or 0)
-    
+
     vehicle_mpg = float(header.get("vehicle_mpg") or 0)
     gas_price = float(header.get("gas_price") or 0)
 
@@ -421,15 +408,17 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
     driver_total_cost = driver_drive_cost + driver_load_cost + driver_unload_cost
 
     # Asset costs
+    depreciation_rate = float(header.get("depreciation_per_mile") or 0)
     depreciation_cost = miles_est * depreciation_rate
-    
-    # Fuel Cost
+
+    # Insurance cost 
+    insurance_cost = insurance_per_mile * miles_est
+
     calculated_fuel_cost = 0.0
     if vehicle_mpg > 0:
         calculated_fuel_cost = (miles_est / vehicle_mpg) * gas_price
     final_fuel_cost = calculated_fuel_cost if fuel_cost_est == 0.0 else float(fuel_cost_est)
 
-    # Prefer proc totals (more robust), but fall back to summing items
     total_cogs = float(totals.get("total_cogs") or sum(float(x.get("total_line_cogs") or 0) for x in items))
     total_weight = float(totals.get("total_weight_lbs") or sum(float(x.get("total_line_weight_lbs") or 0) for x in items))
     total_volume = float(totals.get("total_volume") or sum(float(x.get("total_line_volume") or 0) for x in items))
@@ -437,7 +426,14 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
     entered_revenue = float(totals.get("entered_revenue") or header.get("entered_revenue") or 0)
     calculated_revenue = float(totals.get("calculated_revenue") or sum(float(x.get("total_line_revenue") or 0) for x in items))
 
-    total_cost_est = total_cogs + driver_total_cost + daily_ins + daily_maintenance_cost + final_fuel_cost + depreciation_cost
+    total_cost_est = (
+        total_cogs
+        + driver_total_cost
+        + insurance_cost            
+        + daily_maintenance_cost
+        + final_fuel_cost
+        + depreciation_cost
+    )
 
     profit_vs_entered = entered_revenue - total_cost_est
     profit_vs_calculated = calculated_revenue - total_cost_est
@@ -456,7 +452,10 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
         "driver_drive_rate_per_hr": drive_rate,
         "driver_load_rate_per_hr": load_rate,
 
-        "daily_insurance": daily_ins,
+        # Audit: expose both the per-mile rate and per-trip computed cost 
+        "insurance_per_mile": round(insurance_per_mile, 3),  
+        "daily_insurance": round(insurance_cost, 2),         
+
         "daily_maintenance_cost": daily_maintenance_cost,
         "depreciation_cost_est": round(depreciation_cost, 2),
         "fuel_cost_est": round(final_fuel_cost, 2),
@@ -484,20 +483,12 @@ def build_trip_costs_row(trip_details, drive_minutes_est=60, fuel_cost_est=0.0, 
 
 
 def export_trip_csv(trip_details, output_handle):
-    """
-    Writes a two-section CSV using pre-fetched trip_details:
-      - TRIP_COSTS (one row)
-      - LINE_ITEMS (per-product rows)
-    :param output_handle: File path (str) or file-like object (stream)
-    """
     if not trip_details:
         raise ValueError("No trip details provided")
-    
-    # Build cost DF
+
     costs_row = build_trip_costs_row(trip_details)
     costs_df = pd.DataFrame([costs_row])
 
-    # Build line item DF
     items_df = pd.DataFrame(trip_details["items"])
 
     item_cols = [
@@ -535,30 +526,24 @@ def export_trip_csv(trip_details, output_handle):
 
 
 def export_flattened_csv(trip_details_list, output_handle):
-    """
-    Writes a flattened CSV for a list of trip_details.
-    Each row contains header metrics + line item metrics.
-    """
     if not trip_details_list:
         return
 
     all_rows = []
     for details in trip_details_list:
-        # Calculate costs/metrics
         header_metrics = build_trip_costs_row(details)
         items = details.get("items", [])
-        
+
         if not items:
             all_rows.append(header_metrics)
         else:
             for item in items:
-                # Combine header metrics with item metrics
                 row = header_metrics.copy()
                 row.update(item)
                 all_rows.append(row)
-    
+
     df = pd.DataFrame(all_rows)
-    
+
     should_close = False
     if isinstance(output_handle, str):
         f = open(output_handle, "w", newline="", encoding="utf-8")
@@ -583,12 +568,11 @@ def export_summary_csv(trip_details_list, output_handle):
 
     all_rows = []
     for details in trip_details_list:
-        # Calculate costs/metrics
         header_metrics = build_trip_costs_row(details)
         all_rows.append(header_metrics)
-    
+
     df = pd.DataFrame(all_rows)
-    
+
     should_close = False
     if isinstance(output_handle, str):
         f = open(output_handle, "w", newline="", encoding="utf-8")
