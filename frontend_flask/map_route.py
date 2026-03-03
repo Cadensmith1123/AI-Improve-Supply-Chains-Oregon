@@ -26,7 +26,7 @@ def route_map_embed(route_id: int):
     mapbox_token  = _get_mapbox_token_or_abort()
 
     return render_template(
-        "map_view.html",   # or "map_embed.html" if that's your file
+        "map_view.html", 
         start_address=start_address,
         end_address=end_address,
         mapbox_token=mapbox_token,

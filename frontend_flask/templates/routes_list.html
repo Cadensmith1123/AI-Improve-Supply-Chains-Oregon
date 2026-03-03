@@ -3,121 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Routes</title>
-  <style>
-    :root{
-      --brand:#1D499B;
-      --bg:#f6f8fc;
-      --card:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --border:#e2e8f0;
-      --shadow: 0 10px 25px rgba(2,6,23,.08);
-      --radius: 14px;
-      --danger:#b91c1c;
-    }
-    body { font-family: Arial, sans-serif; margin:0; background:var(--bg); color:var(--text); }
-    .wrap { max-width: 1280px; margin: 28px auto; padding: 0 18px; }
-    .topbar{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom: 16px; }
-    h1{ margin:0; font-size: 28px; letter-spacing: -.3px; }
-    .sub{ color:var(--muted); margin-top:6px; font-size: 13px; }
-
-    .actions{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-    .btn{
-      border:1px solid var(--border); background: var(--card); color: var(--brand);
-      padding: 10px 12px; border-radius: 12px; cursor:pointer; font-weight:700;
-      box-shadow: 0 1px 0 rgba(2,6,23,.03);
-      display:inline-block;
-    }
-    .btn.primary{ background: var(--brand); color: #fff; border-color: transparent; }
-    .btn.small{ padding: 7px 10px; border-radius: 10px; font-size: 12px; }
-    .btn:hover{ filter: brightness(.98); }
-    .btn:active{ transform: translateY(1px); }
-
-    .card{
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid var(--border); padding: 12px 12px; text-align: left; vertical-align: top; }
-    th { background: #f8fafc; font-size: 12px; color: #334155; text-transform: uppercase; letter-spacing:.05em; }
-    td { font-size: 14px; }
-    a { color: var(--brand); text-decoration: none; font-weight: 700; }
-    a:hover { text-decoration: underline; }
-
-    .pill{
-      display:inline-flex; align-items:center; gap:6px;
-      border:1px solid var(--border); padding: 6px 10px; border-radius: 999px;
-      background:#fff;
-      font-weight:800; font-size: 12px; color:#0f172a;
-    }
-    .muted{ color: var(--muted); font-size: 12px; font-weight: 700; }
-    .mini{ font-size:12px; color: var(--muted); font-weight: 800; }
-
-    .stack{ display:flex; flex-direction:column; gap:6px; }
-    .row-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top: 8px; }
-
-    /* Modal */
-    .modal-backdrop{
-      position:fixed; inset:0; background: rgba(15,23,42,.55);
-      display:none; align-items:center; justify-content:center;
-      padding: 18px; z-index: 50;
-    }
-    .modal{
-      width: min(920px, 100%);
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .modal-header{
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 14px 16px; border-bottom: 1px solid var(--border);
-      background: #fbfdff;
-    }
-    .modal-title{ font-weight: 900; }
-    .x{
-      border:1px solid var(--border); background:#fff; border-radius: 12px;
-      padding: 8px 10px; cursor:pointer; font-weight:900; color:#334155;
-    }
-    .modal-body{ padding: 16px; }
-    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .field{ margin: 10px 0; }
-    label{ display:block; font-weight:900; font-size: 12px; color:#334155; margin-bottom: 6px; }
-    input, select{
-      width:100%; padding: 10px 10px;
-      border:1px solid var(--border); border-radius: 12px; outline: none;
-      background:#fff;
-    }
-    input:focus, select:focus{ border-color: rgba(29,73,155,.5); box-shadow: 0 0 0 3px rgba(29,73,155,.12); }
-    .hint{ font-size: 12px; color: var(--muted); margin-top:6px; }
-    .modal-actions{
-      display:flex; justify-content:flex-end; gap:10px;
-      padding: 14px 16px; border-top: 1px solid var(--border); background:#fbfdff;
-    }
-    .error-input{ border-color: var(--danger); background:#fff5f5; }
-    .error-text{ color: var(--danger); font-size: 12px; margin-top: 6px; font-weight: 800; }
-    .alert{
-      background:#fee2e2; color: var(--danger);
-      padding: 10px; border-radius: 12px; margin-bottom: 12px;
-      border: 1px solid rgba(185,28,28,.25);
-      font-weight: 900;
-    }
-
-    .manifest-card{
-      border:1px solid var(--border);
-      border-radius: 12px;
-      overflow:hidden;
-      background:#fff;
-    }
-    .manifest-table th{ background:#f8fafc; }
-    .manifest-table th, .manifest-table td{ padding: 10px; border-bottom:1px solid var(--border); }
-    .manifest-table td:last-child{ text-align:right; }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
@@ -168,14 +54,14 @@
               data-fuel-cost="{{ r.fuel_cost }}"
               data-depreciation-cost="{{ r.depreciation_cost }}"
             >
-              <td><div style="font-weight:900; white-space:nowrap;">{{ r.run_date if r.run_date else '—' }}</div></td>
+              <td><div class="bold nowrap">{{ r.run_date if r.run_date else '—' }}</div></td>
               <td>
-                <div style="font-weight:900;">#{{ r.route_id }}</div>
+                <div class="bold">#{{ r.route_id }}</div>
                 <div class="muted">{{ r.name if r.name else '—' }}</div>
               </td>
 
               <td>
-                <div style="font-weight:900;">{{ r.origin_name }} → {{ r.dest_name }}</div>
+                <div class="bold">{{ r.origin_name }} → {{ r.dest_name }}</div>
                 <div class="muted">{{ r.origin_address }}</div>
                 <div class="muted">{{ r.dest_address }}</div>
               </td>
@@ -186,7 +72,7 @@
                     <div class="muted">No products added</div>
                   {% else %}
                     {% for item in r.manifest_items[:2] %}
-                      <div style="font-size:13px;"><strong>{{ item.product_name }}</strong> × {{ item.quantity }}</div>
+                      <div class="text-13"><strong>{{ item.product_name }}</strong> × {{ item.quantity }}</div>
                     {% endfor %}
                     {% if r.manifest_count > 2 %}
                       <div class="mini">+ {{ r.manifest_count - 2 }} more</div>
@@ -301,7 +187,7 @@
 
       if(!manifest.length){
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td class="muted" colspan="3" style="padding:12px;">No products on this route yet.</td>`;
+        tr.innerHTML = `<td class="muted p-12" colspan="3">No products on this route yet.</td>`;
         tbody.appendChild(tr);
         return;
       }
@@ -309,12 +195,12 @@
       manifest.forEach(item => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td style="font-weight:900;">${item.product_name}</td>
+          <td class="bold">${item.product_name}</td>
           <td>${item.quantity}</td>
           <td>${item.items_per_unit || 1}</td>
           <td>${item.unit_price ? '$'+parseFloat(item.unit_price).toFixed(2) : '-'}</td>
           <td>
-            <div style="display:flex; gap:6px; justify-content:flex-end;">
+            <div class="flex gap-6 justify-end">
               <button class="btn small edit-item-btn" type="button"
                 data-product-id="${item.product_id}"
                 data-qty="${item.quantity}"
@@ -349,7 +235,7 @@
           prodHtml += `<div class="muted">No products added</div>`;
       } else {
           data.manifest.slice(0, 2).forEach(item => {
-              prodHtml += `<div style="font-size:13px;"><strong>${item.product_name}</strong> × ${item.quantity}</div>`;
+              prodHtml += `<div class="text-13"><strong>${item.product_name}</strong> × ${item.quantity}</div>`;
           });
           if (data.manifest_count > 2) {
               prodHtml += `<div class="mini">+ ${data.manifest_count - 2} more</div>`;

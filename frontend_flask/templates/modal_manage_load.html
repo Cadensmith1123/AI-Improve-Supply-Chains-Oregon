@@ -7,24 +7,24 @@
       </div>
 
       <div class="modal-body">
-        <div style="font-weight:900; margin-bottom: 8px;">Current Manifest</div>
+        <div class="modal-subtitle mt-0">Current Manifest</div>
 
-        <div class="manifest-card" style="margin-bottom: 14px; max-height: 240px; overflow-y: auto;">
-          <table class="manifest-table" style="width:100%; border-collapse:collapse;">
+        <div class="manifest-card manifest-scroll">
+          <table class="manifest-table w-100">
             <thead>
               <tr>
-                <th style="text-transform:uppercase; letter-spacing:.05em; font-size:12px; color:#334155; position: sticky; top: 0; z-index: 5;">Product</th>
-                <th style="text-transform:uppercase; letter-spacing:.05em; font-size:12px; color:#334155; position: sticky; top: 0; z-index: 5;">Qty</th>
-                <th style="text-transform:uppercase; letter-spacing:.05em; font-size:12px; color:#334155; position: sticky; top: 0; z-index: 5;">Items/Unit</th>
-                <th style="text-transform:uppercase; letter-spacing:.05em; font-size:12px; color:#334155; position: sticky; top: 0; z-index: 5;">Price</th>
-                <th style="position: sticky; top: 0; z-index: 5;"></th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Items/Unit</th>
+                <th>Price</th>
+                <th></th>
               </tr>
             </thead>
             <tbody id="manifestBody"></tbody>
           </table>
         </div>
 
-        <div style="font-weight:900; margin: 12px 0 8px;">Add / Update Product</div>
+        <div class="modal-subtitle">Add / Update Product</div>
 
         <form method="post" id="addToLoadForm" action="" novalidate>
           <div class="grid2">
@@ -55,7 +55,7 @@
             </div>
           </div>
 
-          <div style="font-weight:900; margin: 14px 0 8px;">Costs & Dimensions (optional)</div>
+          <div class="modal-subtitle">Costs & Dimensions (optional)</div>
           <div class="grid2">
             <div class="field">
                 <label>Cost per Item</label>

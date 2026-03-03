@@ -4,121 +4,7 @@
   <meta charset="utf-8" />
   <title>Route Details</title>
 
-  <style>
-    :root{
-      --brand:#1D499B;
-      --bg:#f6f8fc;
-      --card:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --border:#e2e8f0;
-      --shadow: 0 10px 25px rgba(2,6,23,.08);
-      --radius: 14px;
-    }
-
-    body { font-family: Arial, sans-serif; margin:0; background:var(--bg); color:var(--text); }
-    .wrap { max-width: 1100px; margin: 28px auto; padding: 0 18px; }
-
-    .topbar{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom: 16px; }
-    .actions{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
-
-    .top{
-      display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; gap:12px;
-    }
-
-    h1{ margin:0; font-size: 24px; }
-    .sub{ color:var(--muted); margin-top:6px; font-size: 13px; }
-
-    .btn{
-      border:1px solid var(--border);
-      background: var(--card);
-      color: var(--brand);
-      padding: 10px 12px;
-      border-radius: 12px;
-      cursor:pointer;
-      font-weight:700;
-      text-decoration:none;
-      display:inline-block;
-    }
-    .btn.small{ padding: 7px 10px; border-radius: 10px; font-size: 12px; }
-    .btn.primary{ background: var(--brand); color: #fff; border-color: transparent; }
-    .btn:hover{ filter: brightness(.98); }
-    .btn:active{ transform: translateY(1px); }
-
-    .card{
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      padding: 16px;
-      margin-bottom: 14px;
-    }
-
-    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
-    .k{ font-size: 12px; color:#334155; text-transform: uppercase; font-weight:900; letter-spacing:.05em; }
-    .v{ margin-top:6px; font-weight:800; }
-    .muted{ color:var(--muted); font-size: 13px; margin-top:4px; font-weight:700; }
-
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border-bottom: 1px solid var(--border); padding: 10px; text-align:left; }
-    th { background:#f8fafc; font-size:12px; text-transform: uppercase; letter-spacing:.05em; color:#334155; }
-
-    .map-placeholder{
-      width:100%;
-      height:260px;
-      background:#e5e7eb;
-      border-radius:12px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:#6b7280;
-      font-weight:800;
-    }
-
-    /* Modal Styles */
-    .modal-backdrop{
-      position:fixed; inset:0; background: rgba(15,23,42,.55);
-      display:none; align-items:center; justify-content:center;
-      padding: 18px; z-index: 50;
-    }
-    .modal{
-      width: min(920px, 100%);
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .modal-header{
-      display:flex; align-items:center; justify-content:space-between;
-      padding: 14px 16px; border-bottom: 1px solid var(--border);
-      background: #fbfdff;
-    }
-    .modal-title{ font-weight: 900; }
-    .x{
-      border:1px solid var(--border); background:#fff; border-radius: 12px;
-      padding: 8px 10px; cursor:pointer; font-weight:900; color:#334155;
-    }
-    .modal-body{ padding: 16px; }
-    .field{ margin: 10px 0; }
-    label{ display:block; font-weight:900; font-size: 12px; color:#334155; margin-bottom: 6px; }
-    input, select{
-      width:100%; padding: 10px 10px;
-      border:1px solid var(--border); border-radius: 12px; outline: none;
-      background:#fff;
-    }
-    input:focus, select:focus{ border-color: rgba(29,73,155,.5); box-shadow: 0 0 0 3px rgba(29,73,155,.12); }
-    .hint{ font-size: 12px; color: var(--muted); margin-top:6px; }
-    .modal-actions{
-      display:flex; justify-content:flex-end; gap:10px;
-      padding: 14px 16px; border-top: 1px solid var(--border); background:#fbfdff;
-    }
-    .manifest-card{ border:1px solid var(--border); border-radius: 12px; overflow:hidden; background:#fff; }
-    .manifest-table th{ background:#f8fafc; }
-    .manifest-table th, .manifest-table td{ padding: 10px; border-bottom:1px solid var(--border); }
-    .manifest-table td:last-child{ text-align:right; }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
@@ -131,7 +17,7 @@
         <div class="sub">{{ route.origin_name }} → {{ route.dest_name }}</div>
       </div>
 
-      <div style="display:flex; gap:10px;">
+      <div class="flex gap-10">
         <a class="btn" href="/routes">Back</a>
         <a class="btn" href="{{ url_for('routes.route_export_csv', route_id=route.route_id) }}">Export CSV</a>
         <button class="btn" id="btnEditRoute">Edit</button>
@@ -157,13 +43,13 @@
     <div class="card">
       <div class="grid2">
         <div>
-          <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="flex flex-between items-center">
             <div class="k">Vehicle</div>
             <button class="btn small" id="btnAssignVehicle" style="margin-bottom:4px;">Assign</button>
           </div>
           {% if vehicle %}
-            <div class="v" style="margin-bottom:6px;">{{ vehicle.vehicle_name }}</div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+            <div class="v mb-6">{{ vehicle.vehicle_name }}</div>
+            <div class="grid2 gap-8">
               <div>
                 <div class="muted">Type: {{ vehicle.storage_type }}</div>
                 <div class="muted">MPG: {{ vehicle.mpg }}</div>
@@ -184,7 +70,7 @@
         </div>
 
         <div>
-          <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="flex flex-between items-center">
             <div class="k">Driver</div>
             <button class="btn small" id="btnAssignDriver" style="margin-bottom:4px;">Assign</button>
           </div>
@@ -200,14 +86,14 @@
     </div>
 
     <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <div class="flex flex-between items-center mb-12">
         <div class="k">Financial Metrics</div>
         <button class="btn small" id="btnRecalcCosts">Recalculate Costs</button>
       </div>
       
-      <div style="margin-bottom:16px;">
-        <div class="muted" style="margin-bottom:4px;">Time & Rates</div>
-        <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:12px;">
+      <div class="mb-16">
+        <div class="muted mb-4">Time & Rates</div>
+        <div class="grid-5">
            <div><div class="mini">Drive Mins</div><div class="v">{{ route.drive_minutes_est }}</div></div>
            <div><div class="mini">Load Mins</div><div class="v">{{ route.load_minutes_plan }}</div></div>
            <div><div class="mini">Unload Mins</div><div class="v">{{ route.unload_minutes_plan }}</div></div>
@@ -216,9 +102,9 @@
         </div>
       </div>
 
-      <div style="margin-bottom:16px; border-top:1px solid var(--border); padding-top:12px;">
-        <div class="muted" style="margin-bottom:4px;">Cost Breakdown</div>
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px;">
+      <div class="mb-16 border-top pt-12">
+        <div class="muted mb-4">Cost Breakdown</div>
+        <div class="grid-4">
            <div><div class="mini">Driver (Drive)</div><div class="v">${{ "%.2f"|format(route.driver_drive_cost_est) }}</div></div>
            <div><div class="mini">Driver (Load)</div><div class="v">${{ "%.2f"|format(route.driver_load_cost_est) }}</div></div>
            <div><div class="mini">Driver (Unload)</div><div class="v">${{ "%.2f"|format(route.driver_unload_cost_est) }}</div></div>
@@ -232,29 +118,29 @@
         </div>
       </div>
 
-      <div style="margin-bottom:16px; border-top:1px solid var(--border); padding-top:12px;">
-        <div class="muted" style="margin-bottom:4px;">Load Stats</div>
-        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+      <div class="mb-16 border-top pt-12">
+        <div class="muted mb-4">Load Stats</div>
+        <div class="grid-3">
            <div><div class="mini">Items</div><div class="v">{{ route.line_item_count }}</div></div>
            <div><div class="mini">Total Weight</div><div class="v">{{ route.total_weight_lbs }} lbs</div></div>
            <div><div class="mini">Total Volume</div><div class="v">{{ route.total_volume }} cu ft</div></div>
         </div>
       </div>
 
-      <div style="border-top:1px solid var(--border); padding-top:12px;">
-        <div class="muted" style="margin-bottom:4px;">Profitability (Entered vs Calculated)</div>
-        <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:12px;">
+      <div class="border-top pt-12">
+        <div class="muted mb-4">Profitability (Entered vs Calculated)</div>
+        <div class="grid2">
            <div>
              <div class="mini">Entered Revenue</div>
              <div class="v">${{ "%.2f"|format(route.entered_revenue) }}</div>
-             <div class="mini" style="margin-top:4px;">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
+             <div class="mini mt-4">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
              <div class="mini">Profit: ${{ "%.2f"|format(route.profit_est_entered) }}</div>
              <div class="mini">Margin: {{ "%.1f"|format(route.margin_est_entered * 100) }}%</div>
            </div>
            <div>
              <div class="mini">Calculated Revenue</div>
              <div class="v">${{ "%.2f"|format(route.calculated_revenue) }}</div>
-             <div class="mini" style="margin-top:4px;">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
+             <div class="mini mt-4">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
              <div class="mini">Profit: ${{ "%.2f"|format(route.profit_est_calculated) }}</div>
              <div class="mini">Margin: {{ "%.1f"|format(route.margin_est_calculated * 100) }}%</div>
            </div>
@@ -264,10 +150,10 @@
 
     <div class="card">
       <div class="k">Route Map</div>
-      <div style="position:relative; width:100%; height:360px;">
+      <div class="map-container">
         <iframe
         src="{{ url_for('map.route_map_embed', route_id=route.route_id) }}"
-        style="position:absolute; inset:0; width:100%; height:100%; border:0;"
+        class="map-iframe"
         loading="lazy"
         referrerpolicy="no-referrer-when-downgrade"
         allowfullscreen
@@ -276,7 +162,7 @@
     </div>
 
     <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div class="flex flex-between items-center mb-10">
         <div class="k">Manifest</div>
         <button class="btn small" id="btnManageLoad">Manage Load</button>
       </div>
@@ -443,7 +329,7 @@
 
       if(!manifest.length){
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td class="muted" colspan="5" style="padding:12px;">No products on this route yet.</td>`;
+        tr.innerHTML = `<td class="muted p-12" colspan="5">No products on this route yet.</td>`;
         tbody.appendChild(tr);
         return;
       }
@@ -451,12 +337,12 @@
       manifest.forEach(item => {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td style="font-weight:900;">${item.product_name}</td>
+          <td class="bold">${item.product_name}</td>
           <td>${item.quantity}</td>
           <td>${item.items_per_unit || 1}</td>
           <td>${item.unit_price ? '$'+parseFloat(item.unit_price).toFixed(2) : '-'}</td>
           <td>
-            <div style="display:flex; gap:6px; justify-content:flex-end;">
+            <div class="flex gap-6 justify-end">
               <button class="btn small edit-item-btn" type="button"
                 data-product-id="${item.product_id}"
                 data-qty="${item.quantity}"

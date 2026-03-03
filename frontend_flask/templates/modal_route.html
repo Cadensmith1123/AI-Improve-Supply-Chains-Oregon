@@ -15,7 +15,7 @@
               <!-- Populated by JS -->
             </select>
           </div>
-          <hr style="border:0; border-top:1px solid #e2e8f0; margin:16px 0;">
+          <hr class="hr-modal">
 
           {% if new_route_errors %}
             <div class="alert">Fix the highlighted fields and try again.</div>
@@ -98,7 +98,7 @@
             </div>
           </div>
 
-          <div style="font-weight:900; margin: 14px 0 8px;">Resources (optional)</div>
+          <div class="modal-subtitle">Resources (optional)</div>
           <div class="grid2">
             <div class="field">
               <label>Vehicle</label>
@@ -127,7 +127,7 @@
         </div>
 
         <div class="modal-actions">
-          <button class="btn" type="button" id="btnDeleteRoute" style="background-color:#dc2626; color:white; border:0; margin-right:auto; display:none;">Delete</button>
+          <button class="btn danger-solid mr-auto" type="button" id="btnDeleteRoute" style="display:none;">Delete</button>
           <button class="btn" type="button" data-close>Cancel</button>
           <button class="btn primary" type="submit">Save Route</button>
         </div>

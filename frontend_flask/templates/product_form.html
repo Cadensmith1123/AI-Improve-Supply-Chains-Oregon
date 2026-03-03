@@ -3,20 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>{% if mode == 'new' %}New Product Type{% else %}Edit Product Type{% endif %}</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 24px; }
-    .card { max-width: 700px; border: 1px solid #ddd; padding: 16px; border-radius: 10px; }
-    .field { margin: 12px 0; }
-    label { display:block; font-weight:600; margin-bottom:6px; }
-    input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
-    .error-input { border-color: #b91c1c; background: #fff5f5; }
-    .error-text { color: #b91c1c; font-size: 12px; margin-top: 6px; }
-    .actions { display:flex; gap:10px; margin-top: 16px; }
-    button { padding: 10px 14px; border: 0; border-radius: 8px; background: #1D499B; color: white; cursor:pointer; }
-    a { display:inline-block; padding: 10px 14px; border-radius: 8px; border: 1px solid #ddd; text-decoration:none; color:#1D499B; }
-    .alert { background: #fee2e2; color: #b91c1c; padding: 10px; border-radius: 8px; margin-bottom: 12px; }
-    .muted { color:#666; font-size:12px; margin-top:6px; }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <div class="card">
