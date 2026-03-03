@@ -15,8 +15,7 @@ def _safe_div(numer, denom) -> float:
     return _to_float(numer) / d
 
 # Depreciation
-def depreciation_cost_per_mile(purchase_price, salvage_value, expected_annual_mileage) -> float:
-    total_projected_mileage = expected_annual_mileage * USEFUL_LIFE_YEARS if expected_annual_mileage > 0 else 0.0
+def depreciation_cost_per_mile(purchase_price, salvage_value, total_projected_mileage) -> float:
     pp = _to_float(purchase_price)
     sv = _to_float(salvage_value)
     miles = _to_float(total_projected_mileage)
