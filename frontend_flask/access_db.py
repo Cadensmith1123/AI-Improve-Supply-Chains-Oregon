@@ -76,6 +76,22 @@ def _calculate_vehicle_costs(vehicle_id):
     miles, _ = logic.get_trip_length()
     return logic.calculate_operating_costs(v, miles)
 
+
+CSV_EXPORT_COLUMNS = [
+    "scenario_id", "run_date", "route_name", 
+    "origin_name", "dest_name", "total_distance_miles",
+    "vehicle_name", "driver_name",
+    "entered_revenue", "calculated_revenue", "total_cost", 
+    "profit_est_entered", "profit_est_calculated", "margin_est_entered", "margin_est_calculated",
+    "total_cogs", 
+    "driver_cost_total_est", "fuel_cost_est", 
+    "depreciation_cost_est", "daily_insurance", "daily_maintenance_cost",
+    "driver_drive_cost_est", "driver_load_cost_est", "driver_unload_cost_est",
+    "driver_drive_rate_per_hr", "driver_load_rate_per_hr", "gas_price",
+    "total_weight_lbs", "total_volume", "line_item_count",
+    "drive_minutes_est", "load_minutes_plan", "unload_minutes_plan"
+]
+
 # =============================================================================
 # CREATE
 # =============================================================================
@@ -793,21 +809,7 @@ def remove_product_from_route(route_id: int, product_id):
 
 
 def export_routes_csv(details_list, output_handle):
-    cols = [
-        "scenario_id", "run_date", "route_name", 
-        "origin_name", "dest_name", "total_distance_miles",
-        "vehicle_name", "driver_name",
-        "entered_revenue", "calculated_revenue", "total_cost", 
-        "profit_est_entered", "profit_est_calculated", "margin_est_entered", "margin_est_calculated",
-        "total_cogs", 
-        "driver_cost_total_est", "fuel_cost_est", 
-        "depreciation_cost_est", "daily_insurance", "daily_maintenance_cost",
-        "driver_drive_cost_est", "driver_load_cost_est", "driver_unload_cost_est",
-        "driver_drive_rate_per_hr", "driver_load_rate_per_hr", "gas_price",
-        "total_weight_lbs", "total_volume", "line_item_count",
-        "drive_minutes_est", "load_minutes_plan", "unload_minutes_plan"
-    ]
-    csv_str = logic.generate_csv_export(details_list, columns=cols)
+    csv_str = logic.generate_csv_export(details_list, columns=CSV_EXPORT_COLUMNS)
     output_handle.write(csv_str)
 
 
@@ -815,21 +817,7 @@ def export_route_detailed_csv(details, output_handle):
     # 1. Route Summary (Header)
     costs = details.get('costs', {})
     
-    summary_cols = [
-        "scenario_id", "run_date", "route_name", 
-        "origin_name", "dest_name", "total_distance_miles",
-        "vehicle_name", "driver_name",
-        "entered_revenue", "calculated_revenue", "total_cost", 
-        "profit_est_entered", "profit_est_calculated", "margin_est_entered", "margin_est_calculated",
-        "total_cogs", 
-        "driver_cost_total_est", "fuel_cost_est", 
-        "depreciation_cost_est", "daily_insurance", "daily_maintenance_cost",
-        "driver_drive_cost_est", "driver_load_cost_est", "driver_unload_cost_est",
-        "driver_drive_rate_per_hr", "driver_load_rate_per_hr", "gas_price",
-        "total_weight_lbs", "total_volume", "line_item_count",
-        "drive_minutes_est", "load_minutes_plan", "unload_minutes_plan"
-    ]
-    summary_csv = logic.generate_csv_export([costs], columns=summary_cols)
+    summary_csv = logic.generate_csv_export([costs], columns=CSV_EXPORT_COLUMNS)
     
     output_handle.write("ROUTE_SUMMARY\n")
     output_handle.write(summary_csv)

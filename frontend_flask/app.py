@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 # Add parent directory to path so we can import 'db' package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+"""
+Entry point into the application
+"""
+
 import access_db as db
 from map_route import map_bp
 from routes_bp import routes_bp
@@ -36,14 +40,14 @@ app.register_blueprint(auth_bp, url_prefix="/auth")
 def load_user_from_token():
     """Middleware to authenticate users via JWT in cookie."""
     # Allow public endpoints
-    if request.endpoint in ['login_page', 'register_page', 'static', 'auth.login', 'auth.register', 'health', 'logout']:
+    if request.endpoint in ['static', 'auth.login', 'auth.register', 'health', 'logout']:
         return
 
     # Get Token from Cookie
     token = request.cookies.get('token')
     
     if not token:
-        return redirect(url_for('login_page'))
+        return redirect(url_for('auth.login'))
 
     # Verify Token
     try:
@@ -57,25 +61,9 @@ def load_user_from_token():
 def health():
     return {"status": "ok"}
 
-@app.route('/login')
-def login_page():
-    if request.cookies.get('token'):
-        try:
-            verify_access_token(request.cookies.get('token'))
-            return redirect(url_for('home'))
-        except:
-            pass
-    return render_template('login.html')
-
-@app.route('/register')
-def register_page():
-    if request.cookies.get('token'):
-        return redirect(url_for('home'))
-    return render_template('register.html')
-
 @app.route('/logout')
 def logout():
-    resp = make_response(redirect(url_for('login_page')))
+    resp = make_response(redirect(url_for('auth.login')))
     resp.delete_cookie('token')
     return resp
 

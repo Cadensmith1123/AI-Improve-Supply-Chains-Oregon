@@ -1,12 +1,25 @@
-from flask import Blueprint, request, jsonify
-from .tokens import mint_access_token
+from flask import Blueprint, request, jsonify, current_app, render_template, redirect, url_for
+from .tokens import mint_access_token, verify_access_token
 from .passwords import verify_password, DUMMY_HASH
 from .user_management import get_user_by_username, create_user
 
+"""
+Handles the API endpoints for Authentication (Login/Register).
+"""
+
 auth_bp = Blueprint("auth", __name__)
 
-@auth_bp.post("/login")
+@auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    if request.method == "GET":
+        if request.cookies.get('token'):
+            try:
+                verify_access_token(request.cookies.get('token'))
+                return redirect(url_for('home'))
+            except:
+                pass
+        return render_template('login.html')
+
     data = request.get_json(silent=True) or {}
     username = data.get("username")
     password = data.get("password")
@@ -24,8 +37,13 @@ def login():
     token = mint_access_token(user_id=user["user_id"], tenant_id=user["tenant_id"])
     return jsonify({"token": token})
 
-@auth_bp.post("/register")
+@auth_bp.route("/register", methods=["GET", "POST"])
 def register():
+    if request.method == "GET":
+        if request.cookies.get('token'):
+            return redirect(url_for('home'))
+        return render_template('register.html')
+
     data = request.get_json(silent=True) or {}
     username = data.get("username")
     password = data.get("password")
@@ -44,5 +62,5 @@ def register():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        print(f"Registration Error: {e}")
+        current_app.logger.error(f"Registration Error: {e}")
         return jsonify({"error": "An unexpected error occurred."}), 500
