@@ -16,7 +16,7 @@ from map_route import map_bp
 from routes_bp import routes_bp
 from products_bp import products_bp
 from assets_bp import assets_bp
-from auth.blueprint import auth_bp
+from auth_bp import auth_bp
 from auth.tokens import verify_access_token
 
 load_dotenv()
