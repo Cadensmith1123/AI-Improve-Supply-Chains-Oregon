@@ -53,6 +53,35 @@ def _enrich_manifest_items(items):
     out.sort(key=lambda x: x["product_name"].lower())
     return out
 
+def _calculate_route_internals(header, items):
+    """
+    Centralized logic to enrich manifest and calculate full trip costs.
+    Returns (enriched_manifest, costs_dict).
+    """
+    manifest = _enrich_manifest_items(items)
+    totals = {
+        "total_cogs": round(sum(m['line_cogs'] for m in manifest), 2),
+        "calculated_revenue": round(sum(m['line_total'] for m in manifest), 2),
+        "total_weight_lbs": round(sum(m['line_weight'] for m in manifest), 2),
+        "total_volume": round(sum(m['line_volume'] for m in manifest), 2)
+    }
+    costs = logic.calculate_trip_costs(header, items, totals)
+    return manifest, costs
+
+def _calculate_vehicle_costs(vehicle_id):
+    """
+    Helper to calculate depreciation, insurance, and maintenance for a vehicle
+    based on the standard trip length.
+    Returns (depreciation, daily_insurance, daily_maintenance) or (None, None, None).
+    """
+    if not vehicle_id:
+        return None, None, None
+    v = get_vehicle(vehicle_id)
+    if not v:
+        return None, None, None
+    miles, _ = logic.get_trip_length()
+    return logic.calculate_operating_costs(v, miles)
+
 # =============================================================================
 # CREATE
 # =============================================================================
@@ -188,7 +217,7 @@ def get_all_routes_raw():
         if result_sets and result_sets[0]:
             header = result_sets[0][0]
             items = result_sets[1]
-            costs = logic.calculate_trip_costs(header, items)
+            _, costs = _calculate_route_internals(header, items)
             out.append(costs)
     return out
 
@@ -200,10 +229,11 @@ def get_route_raw(route_id):
     if result_sets and result_sets[0]:
         header = result_sets[0][0]
         items = result_sets[1]
-        d = {'header': header, 'items': items}
-        costs = logic.calculate_trip_costs(d['header'], d['items'])
+        manifest, costs = _calculate_route_internals(header, items)
+        d = {'header': header, 'items': items, 'manifest': manifest}
         d['costs'] = costs
-    return d
+        return d
+    return None
 
 
 def list_products():
@@ -380,14 +410,40 @@ def delete_product(product_code: str):
 # Potential for future optimization database side
 # =============================================================================
 
+def _map_scenario_to_route_view(scenario, route_def):
+    """
+    Helper to map DB scenario/route to frontend list view structure.
+    
+    Returns:
+        dict: A dictionary containing route summary data for the list view.
+    """
+    return {
+        "route_id": scenario.get('scenario_id'), 
+        "run_date": scenario.get('run_date'),
+        "name": route_def.get('name') if route_def else "Unknown Route",
+        "origin_location_id": route_def.get('origin_location_id') if route_def else None,
+        "dest_location_id": route_def.get('dest_location_id') if route_def else None,
+        "sales_amount": logic.safe_float(scenario.get('snapshot_total_revenue')),
+        "entered_revenue": logic.safe_float(scenario.get('snapshot_total_revenue')),
+        "vehicle_id": scenario.get('vehicle_id'),
+        "driver_id": scenario.get('driver_id'),
+        "driver_cost": logic.safe_float(scenario.get('snapshot_driver_wage')),
+        "load_cost": logic.safe_float(scenario.get('snapshot_driver_load_wage')),
+        "unload_cost": logic.safe_float(scenario.get('snapshot_driver_load_wage')),
+        "fuel_cost": 0.0,
+        "depreciation_cost": 0.0,
+        "insurance_cost": logic.safe_float(scenario.get('snapshot_daily_insurance')),
+        "gas_price": logic.safe_float(scenario.get('snapshot_gas_price')),
+    }
 
 def list_routes():
     """
     Does a 'join' in python between routes (name, origin, destination) and 
     scenario (financial, and date specific information)
-
-    This could later be optimized using sql procedures but currently done in
-    python for modularity. 
+    
+    Returns:
+        List[dict]: A list of dictionaries, where each dictionary represents a route 
+                    prepared for the frontend list view.
     """
     scenarios = read.view_scenarios_scoped()
     if not scenarios:
@@ -396,33 +452,17 @@ def list_routes():
     all_routes = read.view_routes_scoped()
     routes_map = {r['route_id']: r for r in all_routes}
 
-    out = []
-    for s in scenarios:
-        r_def = routes_map.get(s.get('route_id'))
-
-        item = {
-            "route_id": s.get('scenario_id'), 
-            "run_date": s.get('run_date'),
-            "name": r_def.get('name') if r_def else "Unknown Route",
-            "origin_location_id": r_def.get('origin_location_id') if r_def else None,
-            "dest_location_id": r_def.get('dest_location_id') if r_def else None,
-            "sales_amount": logic.safe_float(s.get('snapshot_total_revenue')),
-            "entered_revenue": logic.safe_float(s.get('snapshot_total_revenue')),
-            "vehicle_id": s.get('vehicle_id'),
-            "driver_id": s.get('driver_id'),
-            "driver_cost": logic.safe_float(s.get('snapshot_driver_wage')),
-            "load_cost": logic.safe_float(s.get('snapshot_driver_load_wage')),
-            "unload_cost": logic.safe_float(s.get('snapshot_driver_load_wage')),
-            "fuel_cost": 0.0,
-            "depreciation_cost": 0.0,
-            "insurance_cost": logic.safe_float(s.get('snapshot_daily_insurance')),
-            "gas_price": logic.safe_float(s.get('snapshot_gas_price')),
-        }
-        out.append(item)
-    return out
+    return [_map_scenario_to_route_view(s, routes_map.get(s.get('route_id'))) for s in scenarios]
 
 
 def get_route(route_id: int):
+    """
+    Fetches and calculates all details for a specific route.
+
+    Returns:
+        dict: A dictionary containing the full route view (header, enriched manifest, 
+              calculated costs, and UI aliases), or None if the route does not exist.
+    """
     tid = _get_tenant_id()
 
     result_sets = scenario_management.get_complete_route_details(tid, route_id)
@@ -432,81 +472,59 @@ def get_route(route_id: int):
 
     header = result_sets[0][0]
     items = result_sets[1]
+    
+    manifest, costs = _calculate_route_internals(header, items)
 
-    start_address = f"{header.get('origin_address_street')} {header.get('origin_city')} {header.get('origin_state')}"
-    dest_address = f"{header.get('dest_address_street')} {header.get('dest_city')} {header.get('dest_state')}"
+    # Start with raw header data
+    route_view = header.copy()
+    
+    # Merge in calculated costs
+    route_view.update(costs)
 
-    # Enrich items first (handles price fallback and line totals)
-    manifest = _enrich_manifest_items(items)
-
-    # Calculate totals from the enriched manifest to ensure consistency
-    totals = {
-        "total_cogs": round(sum(m['line_cogs'] for m in manifest), 2),
-        "calculated_revenue": round(sum(m['line_total'] for m in manifest), 2),
-        "total_weight_lbs": round(sum(m['line_weight'] for m in manifest), 2),
-        "total_volume": round(sum(m['line_volume'] for m in manifest), 2)
-    }
-
-    costs = logic.calculate_trip_costs(header, items, totals)
-
-    return {
+    # Frontend-specific aliases and formatting
+    route_view.update({
         "route_id": route_id,
-        "name": header.get('route_name'),
-        "origin_location_id": header.get('origin_location_id'),
-        "dest_location_id": header.get('dest_location_id'),
-        "origin_address": start_address, 
-        "dest_address": dest_address,
-        "items": items,  # Return raw items so we don't need to fetch them again
-        "manifest": manifest, # Now fully enriched
-        "base_sales_amount": logic.safe_float(header.get('entered_revenue')),
+        "name": header.get('route_name'), # Frontend expects 'name'
+        "origin_address": f"{header.get('origin_address_street')} {header.get('origin_city')} {header.get('origin_state')}",
+        "dest_address": f"{header.get('dest_address_street')} {header.get('dest_city')} {header.get('dest_state')}",
+        "items": items,
+        "manifest": manifest,
         "sales_amount": logic.safe_float(header.get('entered_revenue')),
-        "vehicle_id": header.get('vehicle_id'),
-        "driver_id": header.get('driver_id'),
-        "driver_name": header.get('driver_name'),
+        "base_sales_amount": logic.safe_float(header.get('entered_revenue')),
+        
+        # Map DB column names to Form field names
         "driver_cost": logic.safe_float(header.get('driver_drive_rate')),
         "load_cost": logic.safe_float(header.get('driver_load_rate')),
         "unload_cost": logic.safe_float(header.get('driver_load_rate')),
-        "fuel_cost": logic.safe_float(costs.get('fuel_cost_est')), # Use calculated cost
-        "depreciation_cost": 0.0,
         "insurance_cost": logic.safe_float(header.get('daily_insurance')),
-        "gas_price": logic.safe_float(header.get('gas_price')),
+        
+        # Calculated Aggregates (Aliases for UI)
         "calc_driver_cost": logic.safe_float(costs.get('driver_cost_total_est')),
         "calc_fuel_cost": logic.safe_float(costs.get('fuel_cost_est')),
-        "calc_vehicle_cost": logic.safe_float(costs.get('depreciation_cost_est')) + logic.safe_float(costs.get('daily_insurance')) + logic.safe_float(costs.get('daily_maintenance_cost')),
         "calc_cogs": logic.safe_float(costs.get('total_cogs')),
-        "calc_total_cost": logic.safe_float(costs.get('driver_cost_total_est')) + logic.safe_float(costs.get('fuel_cost_est')) + logic.safe_float(costs.get('depreciation_cost_est')) + logic.safe_float(costs.get('daily_insurance')) + logic.safe_float(costs.get('daily_maintenance_cost')) + logic.safe_float(costs.get('total_cogs')),
-        
-        "drive_minutes_est": costs.get("drive_minutes_est"),
-        "load_minutes_plan": costs.get("load_minutes_plan"),
-        "unload_minutes_plan": costs.get("unload_minutes_plan"),
-        "driver_drive_rate_per_hr": costs.get("driver_drive_rate_per_hr"),
-        "driver_load_rate_per_hr": costs.get("driver_load_rate_per_hr"),
-        "daily_insurance": costs.get("daily_insurance"),
-        "daily_maintenance_cost": costs.get("daily_maintenance_cost"),
-        "depreciation_cost_est": costs.get("depreciation_cost_est"),
-        "fuel_cost_est": costs.get("fuel_cost_est"),
-        "driver_drive_cost_est": costs.get("driver_drive_cost_est"),
-        "driver_load_cost_est": costs.get("driver_load_cost_est"),
-        "driver_unload_cost_est": costs.get("driver_unload_cost_est"),
-        "driver_cost_total_est": costs.get("driver_cost_total_est"),
-        "line_item_count": costs.get("line_item_count"),
-        "total_weight_lbs": costs.get("total_weight_lbs"),
-        "total_volume": costs.get("total_volume"),
-        "total_cogs": costs.get("total_cogs"),
-        "entered_revenue": costs.get("entered_revenue"),
-        "calculated_revenue": costs.get("calculated_revenue"),
-        "profit_est_entered": costs.get("profit_est_entered"),
-        "profit_est_calculated": costs.get("profit_est_calculated"),
-        "margin_est_entered": costs.get("margin_est_entered"),
-        "margin_est_calculated": costs.get("margin_est_calculated"),
-        "run_date": costs.get("run_date"),
-        "total_distance_miles": costs.get("total_distance_miles"),
-    }
+        "calc_total_cost": logic.safe_float(costs.get('total_cost')),
+        "calc_vehicle_cost": (
+            logic.safe_float(costs.get('depreciation_cost_est')) + 
+            logic.safe_float(costs.get('daily_insurance')) + 
+            logic.safe_float(costs.get('daily_maintenance_cost'))
+        ),
+    })
+
+    return route_view
+
 
 def get_dashboard_data():
     """
     Aggregates all data needed for the main routes dashboard.
     Enriches routes with calculated costs, manifest items, and resolved names.
+
+    Returns:
+        dict: A dictionary containing:
+            - "routes": List[dict] of route summaries with calculated costs.
+            - "locations": List[dict] of available locations.
+            - "vehicles": List[dict] of available vehicles.
+            - "products": List[dict] of available products.
+            - "drivers": List[dict] of available drivers.
     """
     routes = list_routes()
     locations = list_locations()
@@ -563,29 +581,17 @@ def create_route(
     name: str,
     origin_location_id: int,
     dest_location_id: int,
-    origin_address: str,
-    dest_address: str,
     sales_amount: float,
     vehicle_id: Optional[int],
     driver_id: Optional[int],
-    gas_price: Optional[float],
-    driver_cost: Optional[float],
-    load_cost: Optional[float],
-    unload_cost: Optional[float],
-    fuel_cost: Optional[float],
-    depreciation_cost: Optional[float],
-    insurance_cost: Optional[float],
+    gas_price: Optional[float]
 ):
+    """
+    Creates a new route definition and its associated financial scenario.
+    """
     tid = _get_tenant_id()
 
-    depreciation = 0.0
-    daily_insurance = 0.0
-    daily_maintenance = 0.0
-    if vehicle_id:
-        v = get_vehicle(vehicle_id)
-        if v:
-            miles, _ = logic.get_trip_length()
-            depreciation, daily_insurance, daily_maintenance = logic.calculate_operating_costs(v, miles)
+    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
 
     try:
         real_route_id = create.add_route_scoped(
@@ -615,28 +621,16 @@ def update_route(
     name: str,
     origin_location_id: int,
     dest_location_id: int,
-    origin_address: str,
-    dest_address: str,
     sales_amount: float,
-    driver_cost: Optional[float],
-    load_cost: Optional[float],
-    unload_cost: Optional[float],
-    fuel_cost: Optional[float],
-    depreciation_cost: Optional[float],
-    insurance_cost: Optional[float],
     vehicle_id: Optional[int] = None,
     driver_id: Optional[int] = None,
 ):
+    """
+    Updates an existing route's definition and financial scenario.
+    """
     tid = _get_tenant_id()
 
-    depreciation = None
-    daily_insurance = None
-    daily_maintenance = None
-    if vehicle_id:
-        v = get_vehicle(vehicle_id)
-        if v:
-            miles, _ = logic.get_trip_length()
-            depreciation, daily_insurance, daily_maintenance = logic.calculate_operating_costs(v, miles)
+    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
 
     try:
         scenario_management.update_scenario(
@@ -666,6 +660,10 @@ def update_route(
 
 
 def recalculate_route_costs(route_id: int):
+    """
+    Recalculates vehicle-related costs (depreciation, insurance, maintenance) 
+    for a route based on its assigned vehicle and updates the snapshot.
+    """
     tid = _get_tenant_id()
     try:
         scenarios = read.view_scenarios_scoped(ids=route_id)
@@ -673,17 +671,10 @@ def recalculate_route_costs(route_id: int):
             return False, "Scenario not found"
 
         vehicle_id = scenarios[0].get('vehicle_id')
+        dep, ins, maint = _calculate_vehicle_costs(vehicle_id)
 
-        depreciation = 0.0
-        daily_insurance = 0.0
-        daily_maintenance = 0.0
-        if vehicle_id:
-            v = get_vehicle(vehicle_id)
-            if v:
-                miles, _ = logic.get_trip_length()
-                depreciation, daily_insurance, daily_maintenance = logic.calculate_operating_costs(v, miles)
-
-        scenario_management.refresh_scenario(tid, route_id, depreciation, daily_insurance, daily_maintenance)
+        # If no vehicle, default costs to 0.0
+        scenario_management.refresh_scenario(tid, route_id, dep or 0.0, ins or 0.0, maint or 0.0)
         return True, None
     except Exception as e:
         return False, str(e)
@@ -695,15 +686,7 @@ def recalculate_route_costs(route_id: int):
 
 def assign_vehicle_to_route(route_id: int, vehicle_id: Optional[int]):
     tid = _get_tenant_id()
-
-    depreciation = None
-    daily_insurance = None
-    daily_maintenance = None
-    if vehicle_id:
-        v = get_vehicle(vehicle_id)
-        if v:
-            miles, _ = logic.get_trip_length()
-            depreciation, daily_insurance, daily_maintenance = logic.calculate_operating_costs(v, miles)
+    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
 
     try:
         scenario_management.update_scenario(
@@ -770,7 +753,8 @@ def add_product_to_route(
 
     if existing_item:
         try:
-            update.update_manifest_item_scoped(
+            scenario_management.update_manifest_item(
+                tenant_id=tid,
                 manifest_item_id=existing_item['manifest_item_id'],
                 scenario_id=route_id,
                 item_name=prod['name'],
@@ -804,28 +788,17 @@ def add_product_to_route(
 
 def remove_product_from_route(route_id: int, product_id):
     target_code = str(product_id)
-    
-    all_products = read.view_products_master_scoped()
-    target_name = None
-    for p in all_products:
-        if str(p['product_code']) == target_code:
-            target_name = p['name']
-            break
-    
-    if not target_name:
-        target_name = target_code
-    
-    # Optimization: Only fetch items for this route, not the entire table
+
     manifest = get_route_manifest(route_id)
     item_to_delete = None
     for item in manifest:
-        if item.get('product_name') == target_name:
+        if str(item.get('product_id')) == target_code:
             item_to_delete = item.get('manifest_item_id')
             break
     
     if item_to_delete:
         try:
-            delete.delete_manifest_item_scoped(manifest_item_id=item_to_delete)
+            scenario_management.remove_manifest_item(tenant_id=tid, manifest_item_id=item_to_delete)
             return True, None
         except Exception as e:
             return False, str(e)
@@ -881,14 +854,7 @@ def export_route_detailed_csv(details, output_handle):
     output_handle.write("\n")
     
     # 2. Manifest Items
-    items = details.get('items', [])
-    
-    enriched_items = []
-    for i in items:
-        metrics = logic.calculate_manifest_item_metrics(i)
-        row = i.copy()
-        row.update(metrics)
-        enriched_items.append(row)
+    enriched_items = details.get('manifest', [])
         
     items_cols = [
         "product_name", "quantity", "items_per_unit", 

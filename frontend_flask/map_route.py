@@ -5,6 +5,10 @@ import access_db as db
 from dotenv import load_dotenv
 import os
 
+"""
+Handles the map 
+"""
+
 load_dotenv()
 
 map_bp = Blueprint("map", __name__, template_folder="templates")

@@ -34,10 +34,24 @@ def _get_route_response_data(route_id):
 
 
 def _build_routes_page_context(**kwargs):
-    # Fetch pre-aggregated data from DB layer
+    """
+    Prepares all the data needed to display the 'Routes' page.
+
+    This function does two main things:
+    1. Fetches the background data (list of routes, vehicles, drivers) so the dashboard looks complete.
+    2. Handles form errors. If a user tries to create a route but forgets a field, this function 
+       ensures their typed data isn't lost and tells the page to keep the popup window open 
+       so they can see the error message.
+
+    Args:
+        **kwargs: Optional overrides. For example, if there is an error, we pass in the 
+                  specific error message and the data the user tried to submit.
+    """
+    # 1. Fetch the base data required for the dashboard (lists of routes, vehicles, etc.)
     ctx = db.get_dashboard_data()
 
-    # Define default empty form state
+    # 2. Define the default "clean slate" for the new route form. This is used when
+    #    the page is first loaded (a GET request) or when a form is successfully submitted.
     default_new_route = {
         "name": "", "origin_location_id": "", "dest_location_id": "",
         "origin_address": "", "dest_address": "", "sales_amount": "",
@@ -46,7 +60,9 @@ def _build_routes_page_context(**kwargs):
         "fuel_cost": "", "depreciation_cost": "", "insurance_cost": "",
     }
 
-    # Merge defaults with any overrides passed in kwargs
+    # 3. Merge the base data with any UI state overrides passed via kwargs.
+    #    If a kwarg is not provided (e.g., on a simple GET request).
+    #    This keeps the template rendering logic simple.
     ctx.update({
         "new_route_form": kwargs.get("new_route_form") or default_new_route,
         "new_route_errors": kwargs.get("new_route_errors") or {},
@@ -57,6 +73,7 @@ def _build_routes_page_context(**kwargs):
         "route_load_form": kwargs.get("route_load_form") or {},
     })
     
+    # 4. Return the complete context dictionary, ready to be passed to the template.
     return ctx
 
 @routes_bp.get("/routes")
@@ -116,7 +133,15 @@ def route_new_post():
         )
         return render_template("routes_list.html", **ctx), 400
 
-    ok, err, new_id = db.create_route(**data)
+    ok, err, new_id = db.create_route(
+        name=data["name"],
+        origin_location_id=data["origin_location_id"],
+        dest_location_id=data["dest_location_id"],
+        sales_amount=data["sales_amount"],
+        vehicle_id=data["vehicle_id"],
+        driver_id=data["driver_id"],
+        gas_price=data["gas_price"]
+    )
     if not ok:
         abort(400, description=f"Failed to create route: {err}")
 
@@ -330,15 +355,7 @@ def route_edit_post(route_id: int):
         name=data["name"],
         origin_location_id=data["origin_location_id"],
         dest_location_id=data["dest_location_id"],
-        origin_address=data["origin_address"],
-        dest_address=data["dest_address"],
         sales_amount=data["sales_amount"],
-        driver_cost=data["driver_cost"],
-        load_cost=data["load_cost"],
-        unload_cost=data["unload_cost"],
-        fuel_cost=data["fuel_cost"],
-        depreciation_cost=data["depreciation_cost"],
-        insurance_cost=data["insurance_cost"],
         vehicle_id=data.get("vehicle_id"),
         driver_id=data.get("driver_id"),
     )
