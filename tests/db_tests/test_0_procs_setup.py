@@ -16,8 +16,8 @@ SQL_FILES = [
     r"db/procedures/delete_procs.sql",
     r"db/procedures/create_trip_header.sql",
     r"db/procedures/update_trip_header.sql",
-    r"db/procedures/get_trip_details.sql",
-    r"db/procedures/get_planning_assets.sql",
+    r"db/procedures/get_complete_route_details.sql",
+    r"db/procedures/refresh_trip_snapshots.sql",
     r"db/procedures/generate_test_data.sql"
 ]
 
@@ -160,14 +160,14 @@ def test_08_update_trip_header(connection):
     assert statement_count == (count_after - count_before)
 
 
-def test_09_get_trip_details(connection):
+def test_09_get_complete_route_details(connection):
     count_before = get_db_proc_count(connection)
     statement_count = execute_sql_script(connection, SQL_FILES[7])
     count_after = get_db_proc_count(connection)
     assert statement_count == (count_after - count_before)
 
 
-def test_10_get_planning_assets(connection):
+def test_10_refresh_trip_snapshots(connection):
     count_before = get_db_proc_count(connection)
     statement_count = execute_sql_script(connection, SQL_FILES[8])
     count_after = get_db_proc_count(connection)

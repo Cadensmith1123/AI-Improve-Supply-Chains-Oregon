@@ -3,6 +3,10 @@ import io
 import access_db as db
 import logic
 
+"""
+Manages route and scenario routes.
+"""
+
 routes_bp = Blueprint("routes", __name__)
 
 def _get_route_response_data(route_id):
@@ -13,35 +17,10 @@ def _get_route_response_data(route_id):
 
     total_cost = route.get("calc_total_cost", 0.0)
 
-    # Optimization: Use the manifest already mapped by get_route
-    raw_manifest = route.get("manifest", [])
-    
-    manifest = []
-    manifest_subtotal = 0.0
-
-    for item in raw_manifest:
-        unit_price = item.get("unit_price")
-        if unit_price is None:
-            p = db.get_product(item["product_id"])
-        else:
-            p = None
-
-        metrics = logic.calculate_manifest_item_metrics(item, p)
-        manifest_subtotal += metrics["line_total"]
-
-        manifest.append({
-            "product_id": item["product_id"],
-            "product_name": item["product_name"],
-            "quantity": metrics["quantity"],
-            "unit_price": metrics["unit_price"],
-            "items_per_unit": metrics["items_per_unit"],
-            "line_total": metrics["line_total"],
-            "cost_per_item": item.get("cost_per_item"),
-            "unit_weight": item.get("unit_weight"),
-            "unit_volume": item.get("unit_volume"),
-        })
-    
-    manifest.sort(key=lambda x: x["product_name"].lower())
+    # Use centralized enrichment logic
+    manifest = db.get_route_manifest_enriched(route_id)
+    # Use the calculated revenue from the route header (calculated in logic.calculate_trip_costs)
+    manifest_subtotal = route.get("calculated_revenue", 0.0)
 
     return {
         "success": True,
@@ -85,23 +64,15 @@ def _build_routes_page_context(
             r["fuel_cost"] = full_route.get("fuel_cost", 0.0)
             r["depreciation_cost"] = full_route.get("depreciation_cost", 0.0)
 
+            # Use values already calculated in full_route to avoid N+1 manifest fetch and loop
+            r["manifest_count"] = full_route.get("line_item_count", 0)
+            manifest_subtotal = full_route.get("calculated_revenue", 0.0)
+            
+            r["item_revenue"] = manifest_subtotal
+            r["sales_amount"] = float(r.get("sales_amount") or 0) + manifest_subtotal
+
         vid = r.get("vehicle_id")
         r["vehicle_name"] = vehicles_map.get(vid, {}).get("vehicle_name") if vid else None
-
-        # Optimization: get_route_manifest is now efficient, but list_routes could be optimized further in future
-        # For now, we keep this call as list_routes doesn't fetch items to keep the list view light.
-        r["manifest_items"] = db.get_route_manifest(r["route_id"])
-        r["manifest_count"] = len(r["manifest_items"])
-        
-        manifest_subtotal = 0.0
-        for item in r["manifest_items"]:
-            p = products_map.get(str(item["product_id"]))
-            metrics = logic.calculate_manifest_item_metrics(item, p)
-
-            manifest_subtotal += metrics["line_total"]
-        
-        r["item_revenue"] = manifest_subtotal
-        r["sales_amount"] = float(r.get("sales_amount") or 0) + manifest_subtotal
 
     if new_route_form is None:
         new_route_form = {
@@ -461,33 +432,10 @@ def route_view_get(route_id: int):
     if did is not None:
         driver = db.get_driver(did)
 
-    manifest = []
-    manifest_subtotal = 0.0
-
-    # Optimization: Use manifest from route object
-    for item in route.get("manifest", []):
-        unit_price = item.get("unit_price")
-        if unit_price is None:
-            p = db.get_product(item["product_id"])
-        else:
-            p = None
-
-        metrics = logic.calculate_manifest_item_metrics(item, p)
-        manifest_subtotal += metrics["line_total"]
-
-        manifest.append({
-            "product_id": item["product_id"],
-            "product_name": item["product_name"],
-            "quantity": metrics["quantity"],
-            "unit_price": metrics["unit_price"],
-            "items_per_unit": metrics["items_per_unit"],
-            "line_total": metrics["line_total"],
-            "cost_per_item": item.get("cost_per_item"),
-            "unit_weight": item.get("unit_weight"),
-            "unit_volume": item.get("unit_volume"),
-        })
-
-    manifest.sort(key=lambda x: x["product_name"].lower())
+    # Use centralized enrichment logic
+    manifest = db.get_route_manifest_enriched(route_id)
+    # Use the calculated revenue from the route header
+    manifest_subtotal = route.get("calculated_revenue", 0.0)
 
     base_sales = route_view.get("base_sales_amount") or 0.0
     try:

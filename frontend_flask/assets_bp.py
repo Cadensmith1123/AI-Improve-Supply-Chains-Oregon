@@ -1,6 +1,10 @@
 from flask import Blueprint, request, redirect, url_for, abort, jsonify
 import access_db as db
 
+"""
+Manages user asset (vehicles, and drivers) endpoints.
+"""
+
 assets_bp = Blueprint("assets", __name__)
 
 @assets_bp.post("/vehicles/new")

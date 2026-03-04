@@ -2,6 +2,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, abort,
 import access_db as db
 import logic
 
+"""
+Manages the products routes.
+"""
+
 products_bp = Blueprint("products", __name__)
 
 @products_bp.get("/products")
