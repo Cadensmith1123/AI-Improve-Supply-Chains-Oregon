@@ -11,8 +11,8 @@ db_config = {
     "host": os.getenv("DB_HOST"),
     "port": os.getenv("DB_PORT"),
     "database": os.getenv("DB_NAME"),
-    "connection_timeout": 10
-
+    "connection_timeout": 10,
+    "use_pure": True
 }
 
 auth_db_config = {
@@ -21,7 +21,8 @@ auth_db_config = {
     "host": os.getenv("AUTH_DB_HOST"),
     "port": os.getenv("AUTH_DB_PORT"),
     "database": os.getenv("AUTH_DB_NAME"),
-    "connection_timeout": 10
+    "connection_timeout": 10,
+    "use_pure": True
 }
 
 # Global pools
