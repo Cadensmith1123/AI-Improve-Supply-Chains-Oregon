@@ -1,4 +1,3 @@
-from flask import g
 from typing import Optional
 from db.functions.tennant_functions import (
     scoped_read as read, 
@@ -12,11 +11,6 @@ from db.functions import scenario_management
 # =============================================================================
 # HELPERS
 # =============================================================================
-
-
-def _get_tenant_id():
-    """Helper to get tenant_id safely from Flask global context."""
-    return g.get('tenant_id', 1)
 
 
 def _enrich_manifest_items(items):
@@ -207,13 +201,12 @@ def get_vehicle(vehicle_id: int):
 
 
 def get_all_routes_raw():
-    tid = _get_tenant_id()
     # Use optimized fetch for all scenarios
     scenarios = read.view_scenarios_scoped()
     out = []
     for s in scenarios:
         # Reuse the optimized complete fetch
-        result_sets = scenario_management.get_complete_route_details(tid, s['scenario_id'])
+        result_sets = scenario_management.get_complete_route_details(s['scenario_id'])
         if result_sets and result_sets[0]:
             header = result_sets[0][0]
             items = result_sets[1]
@@ -223,8 +216,7 @@ def get_all_routes_raw():
 
 
 def get_route_raw(route_id):
-    tid = _get_tenant_id()
-    result_sets = scenario_management.get_complete_route_details(tid, route_id)
+    result_sets = scenario_management.get_complete_route_details(route_id)
 
     if result_sets and result_sets[0]:
         header = result_sets[0][0]
@@ -331,11 +323,11 @@ def update_vehicle(
             storage_type=storage_type
         )
 
-        tid = _get_tenant_id() # Needed for scenario_management
         scenarios = read.view_scenarios_scoped()
         for s in scenarios:
             if s.get('vehicle_id') == vehicle_id:
-                scenario_management.refresh_scenario(tid, s.get('scenario_id'))
+                dep, ins, maint = _calculate_vehicle_costs(vehicle_id)
+                scenario_management.refresh_scenario(s.get('scenario_id'), dep or 0.0, ins or 0.0, maint or 0.0)
 
         return True, None
     except Exception as e:
@@ -455,6 +447,7 @@ def list_routes():
     return [_map_scenario_to_route_view(s, routes_map.get(s.get('route_id'))) for s in scenarios]
 
 
+
 def get_route(route_id: int):
     """
     Fetches and calculates all details for a specific route.
@@ -463,9 +456,7 @@ def get_route(route_id: int):
         dict: A dictionary containing the full route view (header, enriched manifest, 
               calculated costs, and UI aliases), or None if the route does not exist.
     """
-    tid = _get_tenant_id()
-
-    result_sets = scenario_management.get_complete_route_details(tid, route_id)
+    result_sets = scenario_management.get_complete_route_details(route_id)
 
     if not result_sets or not result_sets[0]:
         return None
@@ -589,8 +580,6 @@ def create_route(
     """
     Creates a new route definition and its associated financial scenario.
     """
-    tid = _get_tenant_id()
-
     depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
 
     try:
@@ -601,7 +590,6 @@ def create_route(
         )
         
         scenario_id = scenario_management.create_scenario(
-            tenant_id=tid,
             route_id=real_route_id,
             total_revenue=sales_amount,
             vehicle_id=vehicle_id,
@@ -628,13 +616,10 @@ def update_route(
     """
     Updates an existing route's definition and financial scenario.
     """
-    tid = _get_tenant_id()
-
     depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
 
     try:
         scenario_management.update_scenario(
-            tenant_id=tid,
             scenario_id=route_id,
             total_revenue=sales_amount,
             vehicle_id=vehicle_id,
@@ -664,7 +649,6 @@ def recalculate_route_costs(route_id: int):
     Recalculates vehicle-related costs (depreciation, insurance, maintenance) 
     for a route based on its assigned vehicle and updates the snapshot.
     """
-    tid = _get_tenant_id()
     try:
         scenarios = read.view_scenarios_scoped(ids=route_id)
         if not scenarios:
@@ -674,7 +658,7 @@ def recalculate_route_costs(route_id: int):
         dep, ins, maint = _calculate_vehicle_costs(vehicle_id)
 
         # If no vehicle, default costs to 0.0
-        scenario_management.refresh_scenario(tid, route_id, dep or 0.0, ins or 0.0, maint or 0.0)
+        scenario_management.refresh_scenario(route_id, dep or 0.0, ins or 0.0, maint or 0.0)
         return True, None
     except Exception as e:
         return False, str(e)
@@ -685,12 +669,10 @@ def recalculate_route_costs(route_id: int):
 
 
 def assign_vehicle_to_route(route_id: int, vehicle_id: Optional[int]):
-    tid = _get_tenant_id()
     depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
 
     try:
         scenario_management.update_scenario(
-            tenant_id=tid,
             scenario_id=route_id,
             vehicle_id=vehicle_id,
             depreciation=depreciation,
@@ -703,10 +685,8 @@ def assign_vehicle_to_route(route_id: int, vehicle_id: Optional[int]):
 
 
 def assign_driver_to_route(route_id: int, driver_id: Optional[int]):
-    tid = _get_tenant_id()
     try:
         scenario_management.update_scenario(
-            tenant_id=tid,
             scenario_id=route_id,
             driver_id=driver_id
         )
@@ -723,8 +703,7 @@ def get_route_manifest(route_id: int):
     """
     Fetches manifest items for a specific route using the optimized stored procedure.
     """
-    tid = _get_tenant_id()
-    result_sets = scenario_management.get_complete_route_details(tid, route_id)
+    result_sets = scenario_management.get_complete_route_details(route_id)
 
     if not result_sets or len(result_sets) < 2:
         return []
@@ -743,18 +722,20 @@ def add_product_to_route(
     cost_per_item: Optional[float] = None,
     unit_weight: Optional[float] = None,
     unit_volume: Optional[float] = None):
-    tid = _get_tenant_id()
     prod = get_product(product_id)
     if not prod:
         return False, "Product not found"
     
-    manifest = get_route_manifest(route_id)
-    existing_item = next((i for i in manifest if str(i['product_id']) == str(product_id)), None)
+    # Optimization: Fetch raw items directly to avoid overhead of calculating costs
+    # just to check for existence.
+    result_sets = scenario_management.get_complete_route_details(route_id)
+    items = result_sets[1] if result_sets and len(result_sets) > 1 else []
+
+    existing_item = next((i for i in items if str(i.get('product_id')) == str(product_id)), None)
 
     if existing_item:
         try:
             scenario_management.update_manifest_item(
-                tenant_id=tid,
                 manifest_item_id=existing_item['manifest_item_id'],
                 scenario_id=route_id,
                 item_name=prod['name'],
@@ -771,7 +752,6 @@ def add_product_to_route(
     else:
         try:
             scenario_management.add_manifest_items(
-                tenant_id=tid,
                 scenario_id=route_id,
                 item_name=prod['name'],
                 quantity_loaded=quantity,
@@ -789,16 +769,18 @@ def add_product_to_route(
 def remove_product_from_route(route_id: int, product_id):
     target_code = str(product_id)
 
-    manifest = get_route_manifest(route_id)
+    result_sets = scenario_management.get_complete_route_details(route_id)
+    items = result_sets[1] if result_sets and len(result_sets) > 1 else []
+
     item_to_delete = None
-    for item in manifest:
+    for item in items:
         if str(item.get('product_id')) == target_code:
             item_to_delete = item.get('manifest_item_id')
             break
     
     if item_to_delete:
         try:
-            scenario_management.remove_manifest_item(tenant_id=tid, manifest_item_id=item_to_delete)
+            scenario_management.remove_manifest_item(manifest_item_id=item_to_delete)
             return True, None
         except Exception as e:
             return False, str(e)

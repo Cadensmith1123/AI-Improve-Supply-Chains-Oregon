@@ -61,6 +61,7 @@ def vehicle_edit_post(vehicle_id: int):
         storage_type=storage_type
     )
     if not ok:
+        print(err)
         abort(400)
     return redirect(url_for("routes.routes_list"))
 
