@@ -26,7 +26,7 @@ auth_db_config = {
 
 def get_db():
     try:
-        return mysql.connector.connect(**db_config)
+        return mysql.connector.connect(**db_config, use_pure=True)
     except Exception as e:
         # Security: Don't print full exception as it may contain credentials
         print(f"DB Connection Error: {type(e).__name__}")
@@ -35,7 +35,7 @@ def get_db():
 
 def get_auth_db():
     try:
-        return mysql.connector.connect(**auth_db_config)
+        return mysql.connector.connect(**auth_db_config, use_pure=True)
     except Exception as e:
         # Security: Don't print full exception as it may contain credentials
         print(f"User DB Connection Error: {type(e).__name__}")
