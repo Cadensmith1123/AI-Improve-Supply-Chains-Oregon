@@ -1,5 +1,7 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 
+"""manages hashing and validating user password"""
+
 # Pre-calculated hash for timing attack mitigation (username enumeration)
 DUMMY_HASH = generate_password_hash("timing_attack_mitigation_constant")
 

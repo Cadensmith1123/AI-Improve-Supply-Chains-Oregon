@@ -2,6 +2,10 @@ from flask import request, redirect, url_for, g
 import jwt
 from .tokens import verify_access_token
 
+"""
+installs middleware to verify JWT for each request.
+"""
+
 def install_auth_middleware(app):
     """
     Installs a before_request hook to handle JWT authentication.
@@ -14,17 +18,6 @@ def install_auth_middleware(app):
 
         # Get Token from Cookie
         token = request.cookies.get('token')
-        
-        # Support Bearer token for API clients
-        if not token:
-            auth_header = request.headers.get('Authorization')
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1]
-
-        if not token:
-            if request.path.startswith("/api"):
-                return {"error": "Unauthorized"}, 401
-            return redirect(url_for('auth.login'))
 
         # Verify Token
         try:

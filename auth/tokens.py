@@ -4,6 +4,9 @@ from typing import Any, Dict
 import jwt
 from flask import current_app
 
+"""
+Mints and validates JWT tokens for auth
+"""
 
 def mint_access_token(*, user_id: int, tenant_id: int) -> str:
     now = int(time.time())
