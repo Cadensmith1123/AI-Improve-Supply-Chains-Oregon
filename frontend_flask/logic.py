@@ -318,6 +318,8 @@ def calculate_trip_costs(header, items, totals=None):
         "scenario_id": header.get("scenario_id"),
         "run_date": header.get("run_date"),
         "route_name": header.get("route_name"),
+        "origin_name": header.get("origin_name"),
+        "dest_name": header.get("dest_name"),
         "vehicle_name": header.get("vehicle_name"),
         "driver_name": header.get("driver_name"),
 
@@ -327,6 +329,7 @@ def calculate_trip_costs(header, items, totals=None):
 
         "driver_drive_rate_per_hr": drive_rate,
         "driver_load_rate_per_hr": load_rate,
+        "gas_price": gas_price,
 
         "daily_insurance": daily_ins,
         "daily_maintenance_cost": maintenance_cost,
@@ -382,10 +385,10 @@ def calculate_manifest_item_metrics(item, product=None):
     weight = safe_float(item.get("unit_weight") or item.get("unit_weight_lbs"))
     volume = safe_float(item.get("unit_volume"))
 
-    line_total = unit_price_f * qty * items_per_unit
-    line_cogs = cost * qty * items_per_unit
-    line_weight = weight * qty
-    line_volume = volume * qty
+    line_total = round(unit_price_f * qty * items_per_unit, 2)
+    line_cogs = round(cost * qty * items_per_unit, 2)
+    line_weight = round(weight * qty, 2)
+    line_volume = round(volume * qty, 2)
     
     return {
         "quantity": qty,
@@ -416,20 +419,26 @@ def aggregate_manifest_totals(items):
         total_volume += m["line_volume"]
         
     return {
-        "total_cogs": total_cogs,
-        "calculated_revenue": total_rev,
-        "total_weight_lbs": total_weight,
-        "total_volume": total_volume
+        "total_cogs": round(total_cogs, 2),
+        "calculated_revenue": round(total_rev, 2),
+        "total_weight_lbs": round(total_weight, 2),
+        "total_volume": round(total_volume, 2)
     }
 
 
-def generate_csv_export(data_list, mode="summary"):
+def generate_csv_export(data_list, columns=None):
     """
     Generates CSV string from list of dicts.
-    mode: 'summary' (list of routes) or 'detail' (single route with items)
+    columns: Optional list of column names to include and order.
     """
     if not data_list:
         return ""
     
     df = pd.DataFrame(data_list)
+    if columns:
+        # Filter and order columns, ignoring those that don't exist in the data
+        valid_cols = [c for c in columns if c in df.columns]
+        if valid_cols:
+            df = df[valid_cols]
+            
     return df.to_csv(index=False)
