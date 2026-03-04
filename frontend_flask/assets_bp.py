@@ -31,6 +31,7 @@ def vehicle_new_post():
         storage_type=storage_type
     )
     if not ok:
+        print(err)
         abort(400)
 
     return redirect(url_for("routes.routes_list"))

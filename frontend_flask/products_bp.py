@@ -39,7 +39,6 @@ def product_new_post():
     ok, err, new_id = db.create_product(**data)
     if not ok:
         abort(400)
-
     return redirect(request.form.get("next") or url_for("products.products_list"))
 
 @products_bp.post("/products/<product_id>/delete")
