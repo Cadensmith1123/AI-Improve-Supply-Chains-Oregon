@@ -40,12 +40,14 @@ def add_product_master_scoped(*, product_code, name, storage_type, conn=None):
 def add_driver_scoped(*, name, hourly_drive_wage, hourly_load_wage, conn=None):
     return add_driver(_tenant_id(), name, hourly_drive_wage, hourly_load_wage, conn=conn)
 
-def add_vehicle_scoped(*, name, mpg, depreciation_per_mile=0.0, annual_insurance_cost=0.0,
-                       annual_maintenance_cost=0.0, max_weight_lbs=None, max_volume_cubic_ft=None,
+def add_vehicle_scoped(*, name, mpg, depreciation_per_mile=0.0, annual_insurance_cost=0.0, purchase_price = 0.0,
+                       yearly_mileage=0.0, salvage_value=0.0, annual_maintenance_cost=0.0, max_weight_lbs=None, max_volume_cubic_ft=None,
                        storage_type=None, conn=None):
     return add_vehicle(
         _tenant_id(),
-        name, mpg, depreciation_per_mile, annual_insurance_cost, annual_maintenance_cost,
+        name, mpg, 
+        purchase_price, yearly_mileage, salvage_value,
+        annual_insurance_cost, annual_maintenance_cost,
         max_weight_lbs, max_volume_cubic_ft, storage_type,
         conn=conn
     )

@@ -1,12 +1,15 @@
+from flask import g
 from db.functions.connect import get_db
-from db.functions.simple_functions import read, create
+from db.functions.tennant_functions import scoped_read as read, scoped_create as create, scoped_update as update, scoped_delete as delete
 from decimal import Decimal #used to combat floating point errors
-import pandas as pd
 from datetime import date
 
 
-def get_locations(tenant_id, conn=None):
-    location_data = read.view_locations(tenant_id, conn=conn, columns=['location_id', 'name'])
+def _get_tenant_id():
+    return g.get('tenant_id', 1)
+
+def get_locations(conn=None):
+    location_data = read.view_locations_scoped(conn=conn, columns=['location_id', 'name'])
     return location_data
 
 
@@ -19,7 +22,6 @@ def _to_dec(x):
 
 
 def create_scenario(
-        tenant_id,
         route_id,
         total_revenue,
         vehicle_id = None,
@@ -51,6 +53,7 @@ def create_scenario(
     if total_revenue is None:
         raise ValueError("total_revenue is required")
 
+    tenant_id = _get_tenant_id()
     route_id = int(route_id)
     vehicle_id = _to_int(vehicle_id)
     driver_id = _to_int(driver_id)
@@ -110,7 +113,6 @@ def create_scenario(
 
 
 def update_scenario(
-    tenant_id,
     scenario_id,
     route_id=None,
     total_revenue=None,
@@ -145,6 +147,7 @@ def update_scenario(
     if conn is None:
         raise RuntimeError("Failed to connect to database")
 
+    tenant_id = _get_tenant_id()
     try:
         cur = conn.cursor(dictionary=True)
 
@@ -175,7 +178,7 @@ def update_scenario(
             conn.close()
 
 
-def refresh_scenario(tenant_id, scenario_id, depreciation, daily_insurance, daily_maintenance, conn=None):
+def refresh_scenario(scenario_id, depreciation, daily_insurance, daily_maintenance, conn=None):
     """
     Updates snapshot values in the scenario header. 
     Requires depreciation, insurance, and maintenance to be passed in (calculated by frontend).
@@ -188,6 +191,7 @@ def refresh_scenario(tenant_id, scenario_id, depreciation, daily_insurance, dail
     if conn is None:
         raise RuntimeError("Failed to connect to database")
 
+    tenant_id = _get_tenant_id()
     try:
         cur = conn.cursor()
         cur.callproc("refresh_trip_snapshots", [tenant_id, scenario_id, depreciation, daily_insurance, daily_maintenance])
@@ -200,7 +204,6 @@ def refresh_scenario(tenant_id, scenario_id, depreciation, daily_insurance, dail
 
 
 def add_manifest_items(
-        tenant_id,
         scenario_id,
         item_name,
         quantity_loaded,
@@ -226,8 +229,7 @@ def add_manifest_items(
     :param unit_weight_lbs: weight per handling unit (optional)
     :param price_per_item: sale price per item (optional)
     """
-    return create.add_manifest_item(
-        tenant_id=tenant_id,
+    return create.add_manifest_item_scoped(
         scenario_id=scenario_id,
         item_name=item_name,
         quantity_loaded=quantity_loaded,
@@ -241,13 +243,49 @@ def add_manifest_items(
         conn=conn
     )
 
+def update_manifest_item(
+        manifest_item_id,
+        scenario_id,
+        item_name,
+        quantity_loaded,
+        cost_per_item=None,
+        items_per_unit=None,
+        unit_weight=None,
+        unit_volume=None,
+        price_per_item=None,
+        conn=None
+):
+    """
+    Updates an existing manifest item.
+    """
+    return update.update_manifest_item_scoped(
+        manifest_item_id=manifest_item_id,
+        scenario_id=scenario_id,
+        item_name=item_name,
+        quantity_loaded=quantity_loaded,
+        snapshot_cost_per_item=cost_per_item,
+        snapshot_items_per_unit=items_per_unit,
+        snapshot_unit_weight=unit_weight,
+        snapshot_unit_volume=unit_volume,
+        snapshot_price_per_item=price_per_item,
+        conn=conn
+    )
+
+def remove_manifest_item(manifest_item_id, conn=None):
+    """
+    Removes an item from the manifest.
+    """
+    return delete.delete_manifest_item_scoped(
+        manifest_item_id=manifest_item_id,
+        conn=conn
+    )
 
 def _safe_dec(val, default="0"):
     """Helper to safely convert values to Decimal, handling None."""
     return Decimal(str(val)) if val is not None else Decimal(default)
 
 
-def get_complete_route_details(tenant_id, scenario_id, conn=None):
+def get_complete_route_details(scenario_id, conn=None):
     """
     Optimized fetch that gets header, route def, locations, and items in one go.
     Solves N+1 problem.
@@ -264,6 +302,7 @@ def get_complete_route_details(tenant_id, scenario_id, conn=None):
     if conn is None:
         raise RuntimeError("Failed to connect to database")
 
+    tenant_id = _get_tenant_id()
     try:
         cur = conn.cursor(dictionary=True)
         cur.callproc("get_complete_route_details", [tenant_id, scenario_id])
