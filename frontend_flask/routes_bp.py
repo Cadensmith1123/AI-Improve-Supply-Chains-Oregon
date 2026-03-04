@@ -11,16 +11,15 @@ def _get_route_response_data(route_id):
     if not route:
         return {"success": False, "message": "Route not found"}
 
-    # Calculate Total Cost
     total_cost = route.get("calc_total_cost", 0.0)
 
-    # Manifest
-    raw_manifest = db.get_route_manifest(route_id)
+    # Optimization: Use the manifest already mapped by get_route
+    raw_manifest = route.get("manifest", [])
+    
     manifest = []
     manifest_subtotal = 0.0
 
     for item in raw_manifest:
-        # Use snapshot price from manifest if available, else fallback to product master
         unit_price = item.get("unit_price")
         if unit_price is None:
             p = db.get_product(item["product_id"])
@@ -79,11 +78,9 @@ def _build_routes_page_context(
         r["origin_name"] = locations_map.get(r["origin_location_id"], f"#{r['origin_location_id']}")
         r["dest_name"] = locations_map.get(r["dest_location_id"], f"#{r['dest_location_id']}")
 
-        # Fetch full route details to get accurate calculated cost (includes fuel, depreciation, etc.)
         full_route = db.get_route(r["route_id"])
         r["total_cost"] = full_route.get("calc_total_cost", 0.0) if full_route else 0.0
         
-        # Ensure cost fields are available for the edit modal
         if full_route:
             r["fuel_cost"] = full_route.get("fuel_cost", 0.0)
             r["depreciation_cost"] = full_route.get("depreciation_cost", 0.0)
@@ -91,13 +88,13 @@ def _build_routes_page_context(
         vid = r.get("vehicle_id")
         r["vehicle_name"] = vehicles_map.get(vid, {}).get("vehicle_name") if vid else None
 
+        # Optimization: get_route_manifest is now efficient, but list_routes could be optimized further in future
+        # For now, we keep this call as list_routes doesn't fetch items to keep the list view light.
         r["manifest_items"] = db.get_route_manifest(r["route_id"])
         r["manifest_count"] = len(r["manifest_items"])
         
-        # Calculate manifest subtotal to add to sales_amount
         manifest_subtotal = 0.0
         for item in r["manifest_items"]:
-            # Use product map for fallback price
             p = products_map.get(str(item["product_id"]))
             metrics = logic.calculate_manifest_item_metrics(item, p)
 
@@ -253,7 +250,6 @@ def route_assign_vehicle_post(route_id: int):
     if not ok:
         abort(400, description=f"Failed to assign vehicle: {err}")
 
-    # If the user was on the view page, send them back there.
     if request.referrer and "view" in request.referrer:
         return redirect(url_for("routes.route_view_get", route_id=route_id))
 
@@ -287,7 +283,6 @@ def route_load_add_post(route_id: int):
 
     data, errors = logic.validate_load_form(request.form)
 
-    # DB Check (kept in BP as logic.py is pure)
     if data["product_id"] is not None and not db.get_product(data["product_id"]):
         errors["product_id"] = "That product does not exist."
 
@@ -453,28 +448,24 @@ def route_view_get(route_id: int):
     route_view["origin_name"] = locations_map.get(route.get("origin_location_id"), f"#{route.get('origin_location_id')}")
     route_view["dest_name"] = locations_map.get(route.get("dest_location_id"), f"#{route.get('dest_location_id')}")
 
-    # Use calculated total cost from access_db
     total_cost = route.get("calc_total_cost", 0.0)
     route_view["total_cost"] = total_cost
 
-    # vehicle details
     vehicle = None
     vid = route.get("vehicle_id")
     if vid is not None:
         vehicle = db.get_vehicle(vid)
 
-    # driver details
     driver = None
     did = route.get("driver_id")
     if did is not None:
         driver = db.get_driver(did)
 
-    # manifest with pricing + subtotal
     manifest = []
     manifest_subtotal = 0.0
 
-    for item in db.get_route_manifest(route_id):
-        # Use snapshot price from manifest if available
+    # Optimization: Use manifest from route object
+    for item in route.get("manifest", []):
         unit_price = item.get("unit_price")
         if unit_price is None:
             p = db.get_product(item["product_id"])

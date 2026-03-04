@@ -1,0 +1,6 @@
+JWT
+Pandas
+Flask
+Gunicorn
+dotenv
+mysql-connector

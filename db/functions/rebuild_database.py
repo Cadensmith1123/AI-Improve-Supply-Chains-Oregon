@@ -14,8 +14,8 @@ SQL_FILES = [
     "db/procedures/delete_procs.sql",
     "db/procedures/create_trip_header.sql",
     "db/procedures/update_trip_header.sql",
-    "db/procedures/get_trip_details.sql",
-    "db/procedures/get_planning_assets.sql",
+    "db/procedures/get_complete_route_details.sql",
+    #"db/procedures/get_planning_assets.sql",
     "db/procedures/generate_test_data.sql",
     "db/procedures/refresh_trip_snapshots.sql",
     "db/schema/auth_SCHEMA.sql",
@@ -28,7 +28,8 @@ def get_db_connection():
         password=os.getenv("DB_PASSWORD"),
         host=os.getenv("DB_HOST"),
         port=os.getenv("DB_PORT"),
-        database=os.getenv("DB_NAME", "local_food_db") # Default to local_food_db if not set
+        database=os.getenv("DB_NAME"), # Default to local_food_db if not set
+        use_pure=True
     )
 
 def execute_sql_file(conn, file_path):

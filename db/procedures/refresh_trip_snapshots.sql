@@ -5,7 +5,9 @@ DROP PROCEDURE IF EXISTS refresh_trip_snapshots $$
 CREATE PROCEDURE refresh_trip_snapshots(
     IN p_tenant_id INT,
     IN p_scenario_id INT,
-    IN p_depreciation DECIMAL(5,3)
+    IN p_depreciation DECIMAL(5,3),
+    IN p_daily_insurance DECIMAL(10,2),
+    IN p_daily_maintenance DECIMAL(10,2)
 )
 BEGIN
     -- Update Driver Snapshots
@@ -21,8 +23,8 @@ BEGIN
     JOIN vehicles v ON s.vehicle_id = v.vehicle_id AND s.tenant_id = v.tenant_id
     SET 
         s.snapshot_vehicle_mpg = v.mpg,
-        s.snapshot_daily_insurance = (v.annual_insurance_cost / 365.0),
-        s.snapshot_daily_maintenance_cost = (v.annual_maintenance_cost / 365.0),
+        s.snapshot_daily_insurance = p_daily_insurance,
+        s.snapshot_daily_maintenance_cost = p_daily_maintenance,
         s.snapshot_depreciation_per_mile = p_depreciation
     WHERE s.scenario_id = p_scenario_id AND s.tenant_id = p_tenant_id;
 
