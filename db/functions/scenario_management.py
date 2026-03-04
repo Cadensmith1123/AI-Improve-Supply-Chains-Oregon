@@ -126,8 +126,6 @@ def update_scenario(
     conn=None
 ):
     """
-    Docstring for update_scenario
-    
     :param scenario_id: Scenario id (required)
     :param route_id: Route id (optional)
     :param total_revenue: total_revenue (optional)
