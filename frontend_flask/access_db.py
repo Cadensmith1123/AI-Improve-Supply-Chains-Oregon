@@ -503,6 +503,61 @@ def get_route(route_id: int):
         "total_distance_miles": costs.get("total_distance_miles"),
     }
 
+def get_dashboard_data():
+    """
+    Aggregates all data needed for the main routes dashboard.
+    Enriches routes with calculated costs, manifest items, and resolved names.
+    """
+    routes = list_routes()
+    locations = list_locations()
+    vehicles = list_vehicles()
+    products = list_products()
+    drivers = list_drivers()
+
+    locations_map = {l["location_id"]: l["name"] for l in locations}
+    vehicles_map = {v["vehicle_id"]: v for v in vehicles}
+
+    for r in routes:
+        # Resolve Location Names
+        r["origin_name"] = locations_map.get(r["origin_location_id"], f"#{r['origin_location_id']}")
+        r["dest_name"] = locations_map.get(r["dest_location_id"], f"#{r['dest_location_id']}")
+
+        # Fetch full route details (costs, manifest)
+        # This calls get_route -> get_complete_route_details -> calculate_trip_costs
+        full_route = get_route(r["route_id"])
+        
+        r["total_cost"] = full_route.get("calc_total_cost", 0.0) if full_route else 0.0
+        r["manifest_items"] = []
+        r["fuel_cost"] = 0.0
+        r["depreciation_cost"] = 0.0
+        r["manifest_count"] = 0
+        r["item_revenue"] = 0.0
+
+        if full_route:
+            r["fuel_cost"] = full_route.get("fuel_cost", 0.0)
+            r["depreciation_cost"] = full_route.get("depreciation_cost", 0.0)
+            r["manifest_count"] = full_route.get("line_item_count", 0)
+            
+            manifest_subtotal = full_route.get("calculated_revenue", 0.0)
+            r["item_revenue"] = manifest_subtotal
+            
+            # Add item revenue to base sales amount
+            base_sales = r.get("sales_amount") or 0.0
+            r["sales_amount"] = base_sales + manifest_subtotal
+            
+            r["manifest_items"] = full_route.get("manifest", [])
+
+        # Resolve Vehicle Name
+        vid = r.get("vehicle_id")
+        r["vehicle_name"] = vehicles_map.get(vid, {}).get("vehicle_name") if vid else None
+
+    return {
+        "routes": routes,
+        "locations": locations,
+        "vehicles": vehicles,
+        "products": products,
+        "drivers": drivers
+    }
 
 def create_route(
     name: str,

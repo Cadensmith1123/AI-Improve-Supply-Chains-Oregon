@@ -33,84 +33,31 @@ def _get_route_response_data(route_id):
     }
 
 
-def _build_routes_page_context(
-    *,
-    new_route_errors=None,
-    new_route_form=None,
-    open_modal="",
-    route_vehicle_errors=None,
-    route_vehicle_form=None,
-    route_load_errors=None,
-    route_load_form=None,
-):
-    routes = db.list_routes()
-    locations_list = db.list_locations()
-    locations_map = {l["location_id"]: l["name"] for l in locations_list}
+def _build_routes_page_context(**kwargs):
+    # Fetch pre-aggregated data from DB layer
+    ctx = db.get_dashboard_data()
 
-    vehicles = db.list_vehicles()
-    products = db.list_products()
-    drivers = db.list_drivers()
-    vehicles_map = {v["vehicle_id"]: v for v in vehicles}
-    products_map = {str(p["product_id"]): p for p in products}
+    # Define default empty form state
+    default_new_route = {
+        "name": "", "origin_location_id": "", "dest_location_id": "",
+        "origin_address": "", "dest_address": "", "sales_amount": "",
+        "vehicle_id": "", "driver_id": "", "gas_price": "",
+        "driver_cost": "", "load_cost": "", "unload_cost": "",
+        "fuel_cost": "", "depreciation_cost": "", "insurance_cost": "",
+    }
 
-    for r in routes:
-        r["origin_name"] = locations_map.get(r["origin_location_id"], f"#{r['origin_location_id']}")
-        r["dest_name"] = locations_map.get(r["dest_location_id"], f"#{r['dest_location_id']}")
-
-        full_route = db.get_route(r["route_id"])
-        r["total_cost"] = full_route.get("calc_total_cost", 0.0) if full_route else 0.0
-        r["manifest_items"] = []
-        
-        if full_route:
-            r["fuel_cost"] = full_route.get("fuel_cost", 0.0)
-            r["depreciation_cost"] = full_route.get("depreciation_cost", 0.0)
-
-            # Use values already calculated in full_route to avoid N+1 manifest fetch and loop
-            r["manifest_count"] = full_route.get("line_item_count", 0)
-            manifest_subtotal = full_route.get("calculated_revenue", 0.0)
-            
-            r["item_revenue"] = manifest_subtotal
-            r["sales_amount"] = float(r.get("sales_amount") or 0) + manifest_subtotal
-            r["manifest_items"] = full_route.get("manifest", [])
-
-        vid = r.get("vehicle_id")
-        r["vehicle_name"] = vehicles_map.get(vid, {}).get("vehicle_name") if vid else None
-
-    if new_route_form is None:
-        new_route_form = {
-            "name": "",
-            "origin_location_id": "",
-            "dest_location_id": "",
-            "origin_address": "",
-            "dest_address": "",
-            "sales_amount": "",
-            "vehicle_id": "",
-            "driver_id": "",
-            "gas_price": "",
-            "driver_cost": "",
-            "load_cost": "",
-            "unload_cost": "",
-            "fuel_cost": "",
-            "depreciation_cost": "",
-            "insurance_cost": "",
-        }
-    if new_route_errors is None:
-        new_route_errors = {}
-
-    return dict(
-        routes=routes,
-        locations=locations_list,
-        vehicles=vehicles,
-        products=products,
-        drivers=drivers,
-        new_route_errors=new_route_errors,
-        new_route_form=new_route_form,
-        open_modal=open_modal,
-        route_vehicle_errors=route_vehicle_errors or {},
-        route_vehicle_form=route_vehicle_form or {},
-        route_load_errors=route_load_errors or {},
-        route_load_form=route_load_form or {},
-    )
+    # Merge defaults with any overrides passed in kwargs
+    ctx.update({
+        "new_route_form": kwargs.get("new_route_form") or default_new_route,
+        "new_route_errors": kwargs.get("new_route_errors") or {},
+        "open_modal": kwargs.get("open_modal", ""),
+        "route_vehicle_errors": kwargs.get("route_vehicle_errors") or {},
+        "route_vehicle_form": kwargs.get("route_vehicle_form") or {},
+        "route_load_errors": kwargs.get("route_load_errors") or {},
+        "route_load_form": kwargs.get("route_load_form") or {},
+    })
+    
+    return ctx
 
 @routes_bp.get("/routes")
 def routes_list():
