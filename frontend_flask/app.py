@@ -1,7 +1,6 @@
 import sys
 import os
-import jwt
-from flask import Flask, render_template, request, redirect, url_for, g, make_response
+from flask import Flask, redirect, url_for, make_response
 from dotenv import load_dotenv
 
 # Add parent directory to path so we can import 'db' package
@@ -17,7 +16,7 @@ from routes_bp import routes_bp
 from products_bp import products_bp
 from assets_bp import assets_bp
 from auth_bp import auth_bp
-from auth.tokens import verify_access_token
+from auth.middleware import install_auth_middleware
 
 load_dotenv()
 
@@ -36,26 +35,8 @@ app.register_blueprint(products_bp)
 app.register_blueprint(assets_bp)
 app.register_blueprint(auth_bp, url_prefix="/auth")
 
-@app.before_request
-def load_user_from_token():
-    """Middleware to authenticate users via JWT in cookie."""
-    # Allow public endpoints
-    if request.endpoint in ['static', 'auth.login', 'auth.register', 'health', 'logout']:
-        return
-
-    # Get Token from Cookie
-    token = request.cookies.get('token')
-    
-    if not token:
-        return redirect(url_for('auth.login'))
-
-    # Verify Token
-    try:
-        payload = verify_access_token(token)
-        g.user_id = payload.get('sub')
-        g.tenant_id = payload.get('tid')
-    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-        return redirect(url_for('logout'))
+# Install Auth Middleware
+install_auth_middleware(app)
 
 @app.get("/health")
 def health():

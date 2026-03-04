@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import mysql.connector
+from mysql.connector import pooling
 import os
 
 load_dotenv()
@@ -23,10 +24,21 @@ auth_db_config = {
     "connection_timeout": 10
 }
 
+# Global pools
+_db_pool = None
+_auth_db_pool = None
+
 
 def get_db():
+    global _db_pool
     try:
-        return mysql.connector.connect(**db_config, use_pure=True)
+        if _db_pool is None:
+            _db_pool = pooling.MySQLConnectionPool(
+                pool_name="main_pool",
+                pool_size=5,
+                **db_config
+            )
+        return _db_pool.get_connection()
     except Exception as e:
         # Security: Don't print full exception as it may contain credentials
         print(f"DB Connection Error: {type(e).__name__}")
@@ -34,8 +46,15 @@ def get_db():
 
 
 def get_auth_db():
+    global _auth_db_pool
     try:
-        return mysql.connector.connect(**auth_db_config, use_pure=True)
+        if _auth_db_pool is None:
+            _auth_db_pool = pooling.MySQLConnectionPool(
+                pool_name="auth_pool",
+                pool_size=5,
+                **auth_db_config
+            )
+        return _auth_db_pool.get_connection()
     except Exception as e:
         # Security: Don't print full exception as it may contain credentials
         print(f"User DB Connection Error: {type(e).__name__}")
