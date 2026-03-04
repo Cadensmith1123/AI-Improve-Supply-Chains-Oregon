@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app, render_template, redirect, url_for
-from ..auth.tokens import mint_access_token, verify_access_token
-from ..auth.passwords import verify_password, DUMMY_HASH
-from ..auth.user_management import get_user_by_username, create_user
+from auth.tokens import mint_access_token, verify_access_token
+from auth.passwords import verify_password, DUMMY_HASH
+from auth.user_management import get_user_by_username, create_user
 
 """
 Handles the API endpoints for Authentication (Login/Register).
