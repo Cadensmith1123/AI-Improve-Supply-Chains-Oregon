@@ -19,21 +19,38 @@ def _get_tenant_id():
     return g.get('tenant_id', 1)
 
 
-def _map_manifest_items(items):
-    """Helper to map raw DB manifest items to frontend structure for compatibility."""
+def _enrich_manifest_items(items):
+    """
+    Maps raw DB manifest items to frontend structure and calculates metrics.
+    Handles price fallback to product master if snapshot is missing.
+    """
     out = []
     for i in items:
+        # Fallback logic: if snapshot price is missing, look up product master
+        p = None
+        if i.get('price_per_item') is None and i.get('unit_price') is None:
+             p = get_product(i['product_id'])
+
+        metrics = logic.calculate_manifest_item_metrics(i, p)
+
         out.append({
             "manifest_item_id": i.get('manifest_item_id'),
             "product_id": i.get('product_id'), 
             "product_name": i.get('product_name'),
-            "quantity": logic.safe_float(i.get('quantity_loaded')),
-            "unit_price": i.get('price_per_item'),
-            "items_per_unit": logic.safe_float(i.get('items_per_unit')),
+            "quantity": metrics['quantity'],
+            "unit_price": metrics['unit_price'],
+            "items_per_unit": metrics['items_per_unit'],
             "cost_per_item": i.get('cost_per_item'),
             "unit_weight": i.get('unit_weight_lbs'),
-            "unit_volume": i.get('unit_volume')
+            "unit_volume": i.get('unit_volume'),
+            # Enriched metrics
+            "line_total": metrics['line_total'],
+            "line_cogs": metrics['line_cogs'],
+            "line_weight": metrics['line_weight'],
+            "line_volume": metrics['line_volume']
         })
+    
+    out.sort(key=lambda x: x["product_name"].lower())
     return out
 
 # =============================================================================
@@ -419,7 +436,16 @@ def get_route(route_id: int):
     start_address = f"{header.get('origin_address_street')} {header.get('origin_city')} {header.get('origin_state')}"
     dest_address = f"{header.get('dest_address_street')} {header.get('dest_city')} {header.get('dest_state')}"
 
-    totals = logic.aggregate_manifest_totals(items)
+    # Enrich items first (handles price fallback and line totals)
+    manifest = _enrich_manifest_items(items)
+
+    # Calculate totals from the enriched manifest to ensure consistency
+    totals = {
+        "total_cogs": round(sum(m['line_cogs'] for m in manifest), 2),
+        "calculated_revenue": round(sum(m['line_total'] for m in manifest), 2),
+        "total_weight_lbs": round(sum(m['line_weight'] for m in manifest), 2),
+        "total_volume": round(sum(m['line_volume'] for m in manifest), 2)
+    }
 
     costs = logic.calculate_trip_costs(header, items, totals)
 
@@ -431,7 +457,7 @@ def get_route(route_id: int):
         "origin_address": start_address, 
         "dest_address": dest_address,
         "items": items,  # Return raw items so we don't need to fetch them again
-        "manifest": _map_manifest_items(items), # Mapped items for frontend use
+        "manifest": manifest, # Now fully enriched
         "base_sales_amount": logic.safe_float(header.get('entered_revenue')),
         "sales_amount": logic.safe_float(header.get('entered_revenue')),
         "vehicle_id": header.get('vehicle_id'),
@@ -667,7 +693,7 @@ def get_route_manifest(route_id: int):
 
     items = result_sets[1]
 
-    return _map_manifest_items(items)
+    return _enrich_manifest_items(items)
 
 
 def add_product_to_route(
@@ -750,29 +776,6 @@ def remove_product_from_route(route_id: int, product_id):
             return False, str(e)
             
     return False, "Item not found in manifest"
-
-# =============================================================================
-# MANIFEST ENRICHMENT
-# =============================================================================
-
-def get_route_manifest_enriched(route_id: int):
-    """
-    Fetches manifest items with calculated metrics (line totals, etc).
-    Handles price fallback to product master if snapshot is missing.
-    """
-    manifest = get_route_manifest(route_id)
-    enriched = []
-    for item in manifest:
-        p = None
-        if item.get("unit_price") is None:
-            p = get_product(item["product_id"])
-            
-        metrics = logic.calculate_manifest_item_metrics(item, p)
-        item.update(metrics)
-        enriched.append(item)
-    
-    enriched.sort(key=lambda x: x["product_name"].lower())
-    return enriched
 
 # =============================================================================
 # CSV EXPORT

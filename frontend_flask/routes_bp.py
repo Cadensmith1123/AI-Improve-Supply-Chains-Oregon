@@ -17,8 +17,8 @@ def _get_route_response_data(route_id):
 
     total_cost = route.get("calc_total_cost", 0.0)
 
-    # Use centralized enrichment logic
-    manifest = db.get_route_manifest_enriched(route_id)
+    # Manifest is already enriched by db.get_route
+    manifest = route.get("manifest", [])
     # Use the calculated revenue from the route header (calculated in logic.calculate_trip_costs)
     manifest_subtotal = route.get("calculated_revenue", 0.0)
 
@@ -59,6 +59,7 @@ def _build_routes_page_context(
 
         full_route = db.get_route(r["route_id"])
         r["total_cost"] = full_route.get("calc_total_cost", 0.0) if full_route else 0.0
+        r["manifest_items"] = []
         
         if full_route:
             r["fuel_cost"] = full_route.get("fuel_cost", 0.0)
@@ -70,6 +71,7 @@ def _build_routes_page_context(
             
             r["item_revenue"] = manifest_subtotal
             r["sales_amount"] = float(r.get("sales_amount") or 0) + manifest_subtotal
+            r["manifest_items"] = full_route.get("manifest", [])
 
         vid = r.get("vehicle_id")
         r["vehicle_name"] = vehicles_map.get(vid, {}).get("vehicle_name") if vid else None
@@ -432,8 +434,8 @@ def route_view_get(route_id: int):
     if did is not None:
         driver = db.get_driver(did)
 
-    # Use centralized enrichment logic
-    manifest = db.get_route_manifest_enriched(route_id)
+    # Manifest is already enriched by db.get_route
+    manifest = route.get("manifest", [])
     # Use the calculated revenue from the route header
     manifest_subtotal = route.get("calculated_revenue", 0.0)
 
