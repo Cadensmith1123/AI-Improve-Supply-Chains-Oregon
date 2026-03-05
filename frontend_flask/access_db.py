@@ -543,21 +543,67 @@ def get_route_raw(route_id):
     return d
 
 def export_routes_csv(details_list, output_handle):
-    csv_str = logic.generate_csv_export(details_list)
+    cols = [
+        "scenario_id", "run_date", "route_name", 
+        "origin_name", "dest_name", "total_distance_miles",
+        "vehicle_name", "driver_name",
+        "entered_revenue", "calculated_revenue", "total_cost", 
+        "profit_est_entered", "margin_est_entered",
+        "total_cogs", 
+        "driver_cost_total_est", "fuel_cost_est", 
+        "depreciation_cost_est", "daily_insurance", "daily_maintenance_cost",
+        "driver_drive_cost_est", "driver_load_cost_est", "driver_unload_cost_est",
+        "driver_drive_rate_per_hr", "driver_load_rate_per_hr", "gas_price",
+        "total_weight_lbs", "total_volume", "line_item_count",
+        "drive_minutes_est", "load_minutes_plan", "unload_minutes_plan"
+    ]
+    csv_str = logic.generate_csv_export(details_list, columns=cols)
     output_handle.write(csv_str)
 
 def export_route_detailed_csv(details, output_handle):
-    items = details.get('items', [])
-    header = details.get('header', {})
+    # 1. Route Summary (Header)
+    costs = details.get('costs', {})
     
-    flat_list = []
+    summary_cols = [
+        "scenario_id", "run_date", "route_name", 
+        "origin_name", "dest_name", "total_distance_miles",
+        "vehicle_name", "driver_name",
+        "entered_revenue", "calculated_revenue", "total_cost", 
+        "profit_est_entered", "margin_est_entered",
+        "total_cogs", 
+        "driver_cost_total_est", "fuel_cost_est", 
+        "depreciation_cost_est", "daily_insurance", "daily_maintenance_cost",
+        "driver_drive_cost_est", "driver_load_cost_est", "driver_unload_cost_est",
+        "driver_drive_rate_per_hr", "driver_load_rate_per_hr", "gas_price",
+        "total_weight_lbs", "total_volume", "line_item_count",
+        "drive_minutes_est", "load_minutes_plan", "unload_minutes_plan"
+    ]
+    summary_csv = logic.generate_csv_export([costs], columns=summary_cols)
+    
+    output_handle.write("ROUTE_SUMMARY\n")
+    output_handle.write(summary_csv)
+    output_handle.write("\n")
+    
+    # 2. Manifest Items
+    items = details.get('items', [])
+    
+    enriched_items = []
     for i in items:
-        row = header.copy()
-        row.update(i)
-        flat_list.append(row)
+        metrics = logic.calculate_manifest_item_metrics(i)
+        row = i.copy()
+        row.update(metrics)
+        enriched_items.append(row)
         
-    csv_str = logic.generate_csv_export(flat_list)
-    output_handle.write(csv_str)
+    items_cols = [
+        "product_name", "quantity", "items_per_unit", 
+        "unit_price", "line_total", 
+        "cost_per_item", "line_cogs",
+        "unit_weight", "line_weight", 
+        "unit_volume", "line_volume"
+    ]
+    items_csv = logic.generate_csv_export(enriched_items, columns=items_cols)
+    output_handle.write("MANIFEST_ITEMS\n")
+    output_handle.write(items_csv)
 
 
 def list_products():
