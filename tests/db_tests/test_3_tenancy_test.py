@@ -33,6 +33,16 @@ def connection():
     if conn:
         conn.close()
 
+def get_trip_details_wrapper(tenant_id, scenario_id, conn=None):
+    """Helper to adapt get_complete_route_details to old get_trip_details format"""
+    result_sets = scenario_funcs.get_complete_route_details(tenant_id, scenario_id, conn=conn)
+    if not result_sets or not result_sets[0]:
+        return None
+    return {
+        'header': result_sets[0][0],
+        'items': result_sets[1]
+    }
+
 def test_location_isolation(connection):
     """
     Verify that a location created by Tenant 1 is not visible to Tenant 2.
@@ -117,12 +127,12 @@ def test_scenario_security(connection):
     )
     
     # 3. Verify A sees scenario
-    details_a = scenario_funcs.get_trip_details(tenant_a, scen_a, conn=connection)
+    details_a = get_trip_details_wrapper(tenant_a, scen_a, conn=connection)
     assert details_a is not None
     assert details_a['header']['scenario_id'] == scen_a
     
     # 4. Verify B does NOT see scenario (get_trip_details returns None)
-    details_b = scenario_funcs.get_trip_details(tenant_b, scen_a, conn=connection)
+    details_b = get_trip_details_wrapper(tenant_b, scen_a, conn=connection)
     assert details_b is None
     
     # 5. Attempt Update by B on A's scenario (Should fail/return None)
@@ -136,7 +146,7 @@ def test_scenario_security(connection):
     assert "scenario_id not found" in str(excinfo.value)
     
     # 6. Verify A's data is unchanged
-    details_a_after = scenario_funcs.get_trip_details(tenant_a, scen_a, conn=connection)
+    details_a_after = get_trip_details_wrapper(tenant_a, scen_a, conn=connection)
     # Revenue should still be 100.00, not 9999.99
     assert details_a_after['header']['entered_revenue'] == Decimal('100.00')
     

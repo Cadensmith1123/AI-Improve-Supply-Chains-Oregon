@@ -66,6 +66,15 @@ def dependencies(connection):
         "driver_id": driver_id
     }
 
+def get_trip_details_wrapper(tenant_id, scenario_id, conn=None):
+    """Helper to adapt get_complete_route_details to old get_trip_details format"""
+    result_sets = scenario_funcs.get_complete_route_details(tenant_id, scenario_id, conn=conn)
+    if not result_sets or not result_sets[0]:
+        return None
+    return {
+        'header': result_sets[0][0],
+        'items': result_sets[1]
+    }
 
 def test_create_scenario(connection, dependencies):
     deps = dependencies
@@ -84,7 +93,7 @@ def test_create_scenario(connection, dependencies):
     assert new_id is not None
     
     # Verify via get_trip_details
-    details = scenario_funcs.get_trip_details(1, new_id, conn=connection)
+    details = get_trip_details_wrapper(1, new_id, conn=connection)
     assert details is not None
     assert details['header']['scenario_id'] == new_id
 
@@ -115,7 +124,7 @@ def test_update_scenario(connection, dependencies):
     )
     
     # Verify
-    details = scenario_funcs.get_trip_details(1, scenario_id, conn=connection)
+    details = get_trip_details_wrapper(1, scenario_id, conn=connection)
     header = details['header']
     
     assert header['gas_price'] == Decimal('5.25') 
@@ -156,7 +165,7 @@ def test_add_manifest_items(connection, dependencies):
     )
     
     # Verify
-    details = scenario_funcs.get_trip_details(1, scenario_id, conn=connection)
+    details = get_trip_details_wrapper(1, scenario_id, conn=connection)
     items = details['items']
     
     assert len(items) == 1
@@ -194,7 +203,7 @@ def test_delete_scenario(connection, dependencies):
     delete.delete_plan(1, scenario_id, conn=connection)
 
     # Verify Gone
-    details = scenario_funcs.get_trip_details(1, scenario_id, conn=connection)
+    details = get_trip_details_wrapper(1, scenario_id, conn=connection)
 
     manifest_id_returned = read.view_manifest_items(1, ids=[manifest_id], conn=connection)
     assert manifest_id_returned == []

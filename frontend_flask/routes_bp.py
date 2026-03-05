@@ -3,6 +3,10 @@ import io
 import access_db as db
 import logic
 
+"""
+Manages route and scenario routes.
+"""
+
 routes_bp = Blueprint("routes", __name__)
 
 def _get_route_response_data(route_id):
@@ -13,35 +17,10 @@ def _get_route_response_data(route_id):
 
     total_cost = route.get("calc_total_cost", 0.0)
 
-    # Optimization: Use the manifest already mapped by get_route
-    raw_manifest = route.get("manifest", [])
-    
-    manifest = []
-    manifest_subtotal = 0.0
-
-    for item in raw_manifest:
-        unit_price = item.get("unit_price")
-        if unit_price is None:
-            p = db.get_product(item["product_id"])
-        else:
-            p = None
-
-        metrics = logic.calculate_manifest_item_metrics(item, p)
-        manifest_subtotal += metrics["line_total"]
-
-        manifest.append({
-            "product_id": item["product_id"],
-            "product_name": item["product_name"],
-            "quantity": metrics["quantity"],
-            "unit_price": metrics["unit_price"],
-            "items_per_unit": metrics["items_per_unit"],
-            "line_total": metrics["line_total"],
-            "cost_per_item": item.get("cost_per_item"),
-            "unit_weight": item.get("unit_weight"),
-            "unit_volume": item.get("unit_volume"),
-        })
-    
-    manifest.sort(key=lambda x: x["product_name"].lower())
+    # Manifest is already enriched by db.get_route
+    manifest = route.get("manifest", [])
+    # Use the calculated revenue from the route header (calculated in logic.calculate_trip_costs)
+    manifest_subtotal = route.get("calculated_revenue", 0.0)
 
     return {
         "success": True,
@@ -54,90 +33,48 @@ def _get_route_response_data(route_id):
     }
 
 
-def _build_routes_page_context(
-    *,
-    new_route_errors=None,
-    new_route_form=None,
-    open_modal="",
-    route_vehicle_errors=None,
-    route_vehicle_form=None,
-    route_load_errors=None,
-    route_load_form=None,
-):
-    routes = db.list_routes()
-    locations_list = db.list_locations()
-    locations_map = {l["location_id"]: l["name"] for l in locations_list}
+def _build_routes_page_context(**kwargs):
+    """
+    Prepares all the data needed to display the 'Routes' page.
 
-    vehicles = db.list_vehicles()
-    products = db.list_products()
-    drivers = db.list_drivers()
-    vehicles_map = {v["vehicle_id"]: v for v in vehicles}
-    products_map = {str(p["product_id"]): p for p in products}
+    This function does two main things:
+    1. Fetches the background data (list of routes, vehicles, drivers) so the dashboard looks complete.
+    2. Handles form errors. If a user tries to create a route but forgets a field, this function 
+       ensures their typed data isn't lost and tells the page to keep the popup window open 
+       so they can see the error message.
 
-    for r in routes:
-        r["origin_name"] = locations_map.get(r["origin_location_id"], f"#{r['origin_location_id']}")
-        r["dest_name"] = locations_map.get(r["dest_location_id"], f"#{r['dest_location_id']}")
+    Args:
+        **kwargs: Optional overrides. For example, if there is an error, we pass in the 
+                  specific error message and the data the user tried to submit.
+    """
+    # 1. Fetch the base data required for the dashboard (lists of routes, vehicles, etc.)
+    ctx = db.get_dashboard_data()
 
-        full_route = db.get_route(r["route_id"])
-        r["total_cost"] = full_route.get("calc_total_cost", 0.0) if full_route else 0.0
-        
-        if full_route:
-            r["fuel_cost"] = full_route.get("fuel_cost", 0.0)
-            r["depreciation_cost"] = full_route.get("depreciation_cost", 0.0)
+    # 2. Define the default "clean slate" for the new route form. This is used when
+    #    the page is first loaded (a GET request) or when a form is successfully submitted.
+    default_new_route = {
+        "name": "", "origin_location_id": "", "dest_location_id": "",
+        "origin_address": "", "dest_address": "", "sales_amount": "",
+        "vehicle_id": "", "driver_id": "", "gas_price": "",
+        "driver_cost": "", "load_cost": "", "unload_cost": "",
+        "fuel_cost": "", "depreciation_cost": "", "insurance_cost": "",
+    }
 
-        vid = r.get("vehicle_id")
-        r["vehicle_name"] = vehicles_map.get(vid, {}).get("vehicle_name") if vid else None
-
-        # Optimization: get_route_manifest is now efficient, but list_routes could be optimized further in future
-        # For now, we keep this call as list_routes doesn't fetch items to keep the list view light.
-        r["manifest_items"] = db.get_route_manifest(r["route_id"])
-        r["manifest_count"] = len(r["manifest_items"])
-        
-        manifest_subtotal = 0.0
-        for item in r["manifest_items"]:
-            p = products_map.get(str(item["product_id"]))
-            metrics = logic.calculate_manifest_item_metrics(item, p)
-
-            manifest_subtotal += metrics["line_total"]
-        
-        r["item_revenue"] = manifest_subtotal
-        r["sales_amount"] = float(r.get("sales_amount") or 0) + manifest_subtotal
-
-    if new_route_form is None:
-        new_route_form = {
-            "name": "",
-            "origin_location_id": "",
-            "dest_location_id": "",
-            "origin_address": "",
-            "dest_address": "",
-            "sales_amount": "",
-            "vehicle_id": "",
-            "driver_id": "",
-            "gas_price": "",
-            "driver_cost": "",
-            "load_cost": "",
-            "unload_cost": "",
-            "fuel_cost": "",
-            "depreciation_cost": "",
-            "insurance_cost": "",
-        }
-    if new_route_errors is None:
-        new_route_errors = {}
-
-    return dict(
-        routes=routes,
-        locations=locations_list,
-        vehicles=vehicles,
-        products=products,
-        drivers=drivers,
-        new_route_errors=new_route_errors,
-        new_route_form=new_route_form,
-        open_modal=open_modal,
-        route_vehicle_errors=route_vehicle_errors or {},
-        route_vehicle_form=route_vehicle_form or {},
-        route_load_errors=route_load_errors or {},
-        route_load_form=route_load_form or {},
-    )
+    # 3. Merge the base data with any UI state overrides passed via kwargs.
+    #    If a kwarg is not provided (e.g., on a simple GET request).
+    #    This keeps the template rendering logic simple.
+    ctx.update({
+        "new_route_form": kwargs.get("new_route_form") or default_new_route,
+        "new_route_errors": kwargs.get("new_route_errors") or {},
+        "open_modal": kwargs.get("open_modal", ""),
+        "route_vehicle_errors": kwargs.get("route_vehicle_errors") or {},
+        "route_vehicle_form": kwargs.get("route_vehicle_form") or {},
+        "route_load_errors": kwargs.get("route_load_errors") or {},
+        "route_load_form": kwargs.get("route_load_form") or {},
+    })
+    
+    # 4. Return the complete context dictionary, ready to be passed to the template.
+    return ctx
 
 @routes_bp.get("/routes")
 def routes_list():
@@ -196,7 +133,15 @@ def route_new_post():
         )
         return render_template("routes_list.html", **ctx), 400
 
-    ok, err, new_id = db.create_route(**data)
+    ok, err, new_id = db.create_route(
+        name=data["name"],
+        origin_location_id=data["origin_location_id"],
+        dest_location_id=data["dest_location_id"],
+        sales_amount=data["sales_amount"],
+        vehicle_id=data["vehicle_id"],
+        driver_id=data["driver_id"],
+        gas_price=data["gas_price"]
+    )
     if not ok:
         abort(400, description=f"Failed to create route: {err}")
 
@@ -410,15 +355,7 @@ def route_edit_post(route_id: int):
         name=data["name"],
         origin_location_id=data["origin_location_id"],
         dest_location_id=data["dest_location_id"],
-        origin_address=data["origin_address"],
-        dest_address=data["dest_address"],
         sales_amount=data["sales_amount"],
-        driver_cost=data["driver_cost"],
-        load_cost=data["load_cost"],
-        unload_cost=data["unload_cost"],
-        fuel_cost=data["fuel_cost"],
-        depreciation_cost=data["depreciation_cost"],
-        insurance_cost=data["insurance_cost"],
         vehicle_id=data.get("vehicle_id"),
         driver_id=data.get("driver_id"),
     )
@@ -461,33 +398,10 @@ def route_view_get(route_id: int):
     if did is not None:
         driver = db.get_driver(did)
 
-    manifest = []
-    manifest_subtotal = 0.0
-
-    # Optimization: Use manifest from route object
-    for item in route.get("manifest", []):
-        unit_price = item.get("unit_price")
-        if unit_price is None:
-            p = db.get_product(item["product_id"])
-        else:
-            p = None
-
-        metrics = logic.calculate_manifest_item_metrics(item, p)
-        manifest_subtotal += metrics["line_total"]
-
-        manifest.append({
-            "product_id": item["product_id"],
-            "product_name": item["product_name"],
-            "quantity": metrics["quantity"],
-            "unit_price": metrics["unit_price"],
-            "items_per_unit": metrics["items_per_unit"],
-            "line_total": metrics["line_total"],
-            "cost_per_item": item.get("cost_per_item"),
-            "unit_weight": item.get("unit_weight"),
-            "unit_volume": item.get("unit_volume"),
-        })
-
-    manifest.sort(key=lambda x: x["product_name"].lower())
+    # Manifest is already enriched by db.get_route
+    manifest = route.get("manifest", [])
+    # Use the calculated revenue from the route header
+    manifest_subtotal = route.get("calculated_revenue", 0.0)
 
     base_sales = route_view.get("base_sales_amount") or 0.0
     try:

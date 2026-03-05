@@ -2,6 +2,14 @@ from decimal import Decimal
 import pandas as pd
 import depreciation_insurance
 
+"""
+Handles all validation and calculation logic.
+"""
+
+# =============================================================================
+# HELPERS/PARSERS
+# =============================================================================
+
 def parse_optional_float(raw: str, field_key: str, errors: dict):
     raw = (raw or "").strip()
     if raw == "":
@@ -22,6 +30,45 @@ def parse_optional_int(raw: str, field_key: str, errors: dict):
     except ValueError:
         errors[field_key] = "Must be a whole number."
         return None
+    
+def parse_capacity_string(capacity, default=1000.0):
+    """Parses a capacity string like '1000 lbs' into a float."""
+    cap_str = str(capacity).split()[0] if capacity else ""
+    return safe_float(cap_str, default)
+
+def safe_float(val, default=0.0):
+    """Safely converts a value to float, returning default on failure."""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_int(val, default=0):
+    """Safely converts a value to int, returning default on failure."""
+    if val is None:
+        return default
+    try:
+        # Handle strings like "30.0" by converting to float first
+        return int(float(val))
+    except (ValueError, TypeError):
+        return default
+
+
+def to_decimal(val, default="0"):
+    """Helper to safely convert values to Decimal."""
+    if val is None:
+        return Decimal(default)
+    try:
+        return Decimal(str(val))
+    except Exception:
+        return Decimal(default)
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
 
 
 def validate_route_form(form):
@@ -169,41 +216,10 @@ def validate_load_form(form):
     }
     return data, errors
 
+# =============================================================================
+# CALCULATIONS
+# =============================================================================
 
-def safe_float(val, default=0.0):
-    """Safely converts a value to float, returning default on failure."""
-    if val is None:
-        return default
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return default
-
-
-def safe_int(val, default=0):
-    """Safely converts a value to int, returning default on failure."""
-    if val is None:
-        return default
-    try:
-        # Handle strings like "30.0" by converting to float first
-        return int(float(val))
-    except (ValueError, TypeError):
-        return default
-
-
-def to_decimal(val, default="0"):
-    """Helper to safely convert values to Decimal."""
-    if val is None:
-        return Decimal(default)
-    try:
-        return Decimal(str(val))
-    except Exception:
-        return Decimal(default)
-
-def parse_capacity_string(capacity, default=1000.0):
-    """Parses a capacity string like '1000 lbs' into a float."""
-    cap_str = str(capacity).split()[0] if capacity else ""
-    return safe_float(cap_str, default)
 
 def get_trip_length():
     """
@@ -214,11 +230,13 @@ def get_trip_length():
     time_est = 80.5
     return miles_est, time_est
 
+
 def calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles):
     depreciation_cost = depreciation_insurance.trip_depreciation_cost(
         purchase_price, salvage_value, yearly_mileage, trip_miles
     )
     return depreciation_cost
+
 
 def calculate_insurance(annual_insurance_cost, yearly_mileage, trip_miles):
     insurance_cost = depreciation_insurance.trip_insurance_cost(annual_insurance_cost, yearly_mileage, trip_miles)
@@ -229,6 +247,7 @@ def calculate_maintenance(annual_maintenance_cost, yearly_mileage, trip_miles):
     # Maintenance is calculated same as insurance (Annual / Yearly Miles * Trip Miles)
     return depreciation_insurance.trip_insurance_cost(annual_maintenance_cost, yearly_mileage, trip_miles)
 
+
 def calculate_operating_costs(vehicle, trip_miles):
     """
     Calculates operating costs (depreciation, insurance, maintenance) for a vehicle.
@@ -236,7 +255,7 @@ def calculate_operating_costs(vehicle, trip_miles):
     """
     if not vehicle:
         return Decimal("0.0"), Decimal("0.0"), Decimal("0.0")
-    
+
     # Extract values safely
     purchase_price = vehicle.get('vehicle_purchase_price')
     salvage_value = vehicle.get('vehicle_estimated_salvage_value')
@@ -247,8 +266,9 @@ def calculate_operating_costs(vehicle, trip_miles):
     dep = calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles)
     ins = calculate_insurance(annual_insurance, yearly_mileage, trip_miles)
     maint = calculate_maintenance(annual_maintenance, yearly_mileage, trip_miles)
-    
+
     return dep, ins, maint
+
 
 def calculate_driver_costs(drive_minutes, load_minutes, unload_minutes, drive_rate, load_rate):
     """
@@ -259,8 +279,9 @@ def calculate_driver_costs(drive_minutes, load_minutes, unload_minutes, drive_ra
     load_cost = (load_minutes / 60) * load_rate
     unload_cost = (unload_minutes / 60) * load_rate
     total_cost = drive_cost + load_cost + unload_cost
-    
+
     return drive_cost, load_cost, unload_cost, total_cost
+
 
 def calculate_fuel_cost(miles, mpg, gas_price, estimated_cost=0.0):
     """
@@ -269,10 +290,10 @@ def calculate_fuel_cost(miles, mpg, gas_price, estimated_cost=0.0):
     """
     if estimated_cost > 0:
         return estimated_cost
-        
+    
     if mpg > 0:
         return (miles / mpg) * gas_price
-        
+    
     return 0.0
 
 
@@ -355,7 +376,7 @@ def calculate_trip_costs(header, items, totals=None):
         "margin_est_entered": round((profit_vs_entered / entered_revenue) if entered_revenue else 0, 4),
         "margin_est_calculated": round((profit_vs_calculated / calculated_revenue) if calculated_revenue else 0, 4),
         "total_distance_miles": round(miles_est, 1),
-        
+
         "total_cost": round(total_cost_est, 2)
     }
 
@@ -371,14 +392,14 @@ def calculate_manifest_item_metrics(item, product=None):
 
     if (unit_price is None or unit_price == "") and product:
         unit_price = product.get("unit_price")
-    
+
     unit_price_f = safe_float(unit_price)
-    
+
     qty_val = item.get("quantity")
     if qty_val is None or qty_val == "":
         qty_val = item.get("quantity_loaded")
     qty = safe_float(qty_val)
-    
+
     items_per_unit = safe_float(item.get("items_per_unit"), 1.0)
 
     cost = safe_float(item.get("cost_per_item"))
@@ -410,14 +431,14 @@ def aggregate_manifest_totals(items):
     total_rev = 0.0
     total_weight = 0.0
     total_volume = 0.0
-    
+
     for i in items:
         m = calculate_manifest_item_metrics(i)
         total_cogs += m["line_cogs"]
         total_rev += m["line_total"]
         total_weight += m["line_weight"]
         total_volume += m["line_volume"]
-        
+
     return {
         "total_cogs": round(total_cogs, 2),
         "calculated_revenue": round(total_rev, 2),
@@ -433,12 +454,12 @@ def generate_csv_export(data_list, columns=None):
     """
     if not data_list:
         return ""
-    
+
     df = pd.DataFrame(data_list)
     if columns:
         # Filter and order columns, ignoring those that don't exist in the data
         valid_cols = [c for c in columns if c in df.columns]
         if valid_cols:
             df = df[valid_cols]
-            
+
     return df.to_csv(index=False)

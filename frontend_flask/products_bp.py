@@ -2,6 +2,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, abort,
 import access_db as db
 import logic
 
+"""
+Manages the products routes.
+"""
+
 products_bp = Blueprint("products", __name__)
 
 @products_bp.get("/products")
@@ -35,7 +39,6 @@ def product_new_post():
     ok, err, new_id = db.create_product(**data)
     if not ok:
         abort(400)
-
     return redirect(request.form.get("next") or url_for("products.products_list"))
 
 @products_bp.post("/products/<product_id>/delete")

@@ -1,6 +1,10 @@
 from flask import Blueprint, request, redirect, url_for, abort, jsonify
 import access_db as db
 
+"""
+Manages user asset (vehicles, and drivers) endpoints.
+"""
+
 assets_bp = Blueprint("assets", __name__)
 
 @assets_bp.post("/vehicles/new")
@@ -27,6 +31,7 @@ def vehicle_new_post():
         storage_type=storage_type
     )
     if not ok:
+        print(err)
         abort(400)
 
     return redirect(url_for("routes.routes_list"))
@@ -57,6 +62,7 @@ def vehicle_edit_post(vehicle_id: int):
         storage_type=storage_type
     )
     if not ok:
+        print(err)
         abort(400)
     return redirect(url_for("routes.routes_list"))
 

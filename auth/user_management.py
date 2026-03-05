@@ -4,6 +4,9 @@ from typing import Optional, List, Dict, Any
 from db.functions.connect import get_auth_db
 from auth.passwords import hash_password
 
+"""
+Manages creation and deletion (not implemented on front end) of users in auth database.
+"""
 
 @contextmanager
 def _get_db_context(conn=None):
