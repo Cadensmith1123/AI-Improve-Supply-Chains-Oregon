@@ -1,6 +1,9 @@
 from decimal import Decimal
 import pandas as pd
 import depreciation_insurance
+import os
+import requests
+from urllib.parse import quote
 
 """
 Handles all validation and calculation logic.
@@ -221,14 +224,62 @@ def validate_load_form(form):
 # =============================================================================
 
 
-def get_trip_length():
+def fetch_mapbox_distance(origin_address, dest_address):
+    """
+    Calls Mapbox API to get distance (miles) and duration (minutes).
+    Returns (miles, minutes) or (None, None) if failed.
+    """
+    token = os.getenv("MAPBOX_TOKEN")
+    if not token or not origin_address or not dest_address:
+        return None, None
+
+    try:
+        # Helper to geocode address to [lng, lat]
+        def _geocode(addr):
+            url = f"https://api.mapbox.com/geocoding/v5/mapbox.places/{quote(addr)}.json"
+            resp = requests.get(url, params={"access_token": token, "limit": 1}, timeout=5)
+            if resp.status_code == 200:
+                feats = resp.json().get("features")
+                if feats:
+                    return feats[0]["center"]
+            return None
+
+        start_coords = _geocode(origin_address)
+        end_coords = _geocode(dest_address)
+
+        if start_coords and end_coords:
+            # Mapbox Directions: {lng},{lat};{lng},{lat}
+            coords_path = f"{start_coords[0]},{start_coords[1]};{end_coords[0]},{end_coords[1]}"
+            dir_url = f"https://api.mapbox.com/directions/v5/mapbox/driving/{coords_path}"
+            
+            resp = requests.get(dir_url, params={"access_token": token, "overview": "false"}, timeout=5)
+            if resp.status_code == 200:
+                route_data = resp.json()
+                if route_data.get("routes"):
+                    route = route_data["routes"][0]
+                    # Convert meters to miles (1 meter = 0.000621371 miles)
+                    miles = route["distance"] * 0.000621371
+                    # Convert seconds to minutes
+                    minutes = route["duration"] / 60.0
+                    return miles, minutes
+    except Exception as e:
+        print(f"Mapbox API Error: {e}")
+
+    return None, None
+
+
+def get_trip_length(header):
     """
     Returns trip distance (miles) and time (minutes).
-    Currently a stub for a future external API call.
     """
-    miles_est =  25.2
-    time_est = 80.5
-    return miles_est, time_est
+    dest_address = f"{header.get('dest_address_street')} {header.get('dest_city')} {header.get('dest_state')}"
+
+    origin_address = f"{header.get('origin_address_street')} {header.get('origin_city')} {header.get('origin_state')}"
+    miles_est, time_est = fetch_mapbox_distance(origin_address, dest_address)
+    if not miles_est or not time_est:
+        miles_est = 0.0
+        time_est = 0.0
+    return round(miles_est,2), round(time_est,2)
 
 
 def calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles):
@@ -315,7 +366,7 @@ def calculate_trip_costs(header, items, totals=None):
 
     load_min = safe_float(header.get("plan_load_min"))
     unload_min = safe_float(header.get("plan_unload_min"))
-    miles_est, drive_min = get_trip_length()
+    miles_est, drive_min = get_trip_length(header)
 
     driver_drive_cost, driver_load_cost, driver_unload_cost, driver_total_cost = calculate_driver_costs(
         drive_min, load_min, unload_min, drive_rate, load_rate
