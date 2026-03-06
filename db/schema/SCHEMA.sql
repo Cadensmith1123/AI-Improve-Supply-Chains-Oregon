@@ -137,7 +137,7 @@ CREATE TABLE scenarios (
     snapshot_driver_load_wage DECIMAL(5, 2),
     snapshot_vehicle_mpg DECIMAL(4, 1),
     snapshot_gas_price DECIMAL(6, 3),
-    snapshot_depreciation_per_mile DECIMAL(5, 3),
+    snapshot_depreciation_per_mile DECIMAL(10, 3),
     snapshot_daily_insurance DECIMAL(10, 2),
     snapshot_daily_maintenance_cost DECIMAL(10, 2),
     snapshot_planned_load_minutes INT,

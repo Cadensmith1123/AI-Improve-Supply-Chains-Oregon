@@ -62,7 +62,7 @@ def _calculate_route_internals(header, items):
     costs = logic.calculate_trip_costs(header, items, totals)
     return manifest, costs
 
-def _calculate_vehicle_costs(vehicle_id):
+def _calculate_vehicle_costs(vehicle_id, header):
     """
     Helper to calculate depreciation, insurance, and maintenance for a vehicle
     based on the standard trip length.
@@ -73,7 +73,7 @@ def _calculate_vehicle_costs(vehicle_id):
     v = get_vehicle(vehicle_id)
     if not v:
         return None, None, None
-    miles, _ = logic.get_trip_length()
+    miles, _ = logic.get_trip_length(header)
     return logic.calculate_operating_costs(v, miles)
 
 
@@ -342,8 +342,12 @@ def update_vehicle(
         scenarios = read.view_scenarios_scoped()
         for s in scenarios:
             if s.get('vehicle_id') == vehicle_id:
-                dep, ins, maint = _calculate_vehicle_costs(vehicle_id)
-                scenario_management.refresh_scenario(s.get('scenario_id'), dep or 0.0, ins or 0.0, maint or 0.0)
+                sid = s.get('scenario_id')
+                result_sets = scenario_management.get_complete_route_details(sid)
+                if result_sets and result_sets[0]:
+                    header = result_sets[0][0]
+                    dep, ins, maint = _calculate_vehicle_costs(vehicle_id, header)
+                    scenario_management.refresh_scenario(sid, dep or 0.0, ins or 0.0, maint or 0.0)
 
         return True, None
     except Exception as e:
@@ -596,7 +600,6 @@ def create_route(
     """
     Creates a new route definition and its associated financial scenario.
     """
-    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
 
     try:
         real_route_id = create.add_route_scoped(
@@ -604,7 +607,28 @@ def create_route(
             origin_location_id=origin_location_id,
             dest_location_id=dest_location_id
         )
-        
+
+        origin_rows = read.view_locations_scoped(ids=origin_location_id)
+        dest_rows = read.view_locations_scoped(ids=dest_location_id)
+
+        if not origin_rows or not dest_rows:
+            raise ValueError("Origin or Destination location not found.")
+
+        origin = origin_rows[0]
+        dest = dest_rows[0]
+
+        # Construct a temporary header dict for logic.get_trip_length
+        header = {
+            'origin_address_street': origin.get('address_street'),
+            'origin_city': origin.get('city'),
+            'origin_state': origin.get('state'),
+            'dest_address_street': dest.get('address_street'),
+            'dest_city': dest.get('city'),
+            'dest_state': dest.get('state')
+        }
+
+        depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id, header)
+
         scenario_id = scenario_management.create_scenario(
             route_id=real_route_id,
             total_revenue=sales_amount,
@@ -632,7 +656,34 @@ def update_route(
     """
     Updates an existing route's definition and financial scenario.
     """
-    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
+    result_sets = scenario_management.get_complete_route_details(route_id)
+    if not result_sets or not result_sets[0]:
+        return False, "Route not found"
+
+    header = result_sets[0][0]
+
+    # If locations changed, we must fetch new addresses to calculate accurate distance/costs
+    # before saving the scenario.
+    calc_header = header.copy()
+    if (int(origin_location_id) != header.get('origin_location_id') or 
+        int(dest_location_id) != header.get('dest_location_id')):
+        
+        origin_rows = read.view_locations_scoped(ids=origin_location_id)
+        dest_rows = read.view_locations_scoped(ids=dest_location_id)
+        if origin_rows and dest_rows:
+            origin = origin_rows[0]
+            dest = dest_rows[0]
+            calc_header['origin_address_street'] = origin.get('address_street')
+            calc_header['origin_city'] = origin.get('city')
+            calc_header['origin_state'] = origin.get('state')
+            calc_header['dest_address_street'] = dest.get('address_street')
+            calc_header['dest_city'] = dest.get('city')
+            calc_header['dest_state'] = dest.get('state')
+
+    # Use the new vehicle_id if provided, otherwise fall back to the existing one in the header
+    effective_vehicle_id = vehicle_id if vehicle_id is not None else header.get('vehicle_id')
+    
+    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(effective_vehicle_id, calc_header)
 
     try:
         scenario_management.update_scenario(
@@ -671,7 +722,9 @@ def recalculate_route_costs(route_id: int):
             return False, "Scenario not found"
 
         vehicle_id = scenarios[0].get('vehicle_id')
-        dep, ins, maint = _calculate_vehicle_costs(vehicle_id)
+        result_sets = scenario_management.get_complete_route_details(route_id)
+        header = result_sets[0][0]
+        dep, ins, maint = _calculate_vehicle_costs(vehicle_id, header)
 
         # If no vehicle, default costs to 0.0
         scenario_management.refresh_scenario(route_id, dep or 0.0, ins or 0.0, maint or 0.0)
@@ -685,7 +738,9 @@ def recalculate_route_costs(route_id: int):
 
 
 def assign_vehicle_to_route(route_id: int, vehicle_id: Optional[int]):
-    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id)
+    result_sets = scenario_management.get_complete_route_details(route_id)
+    header = result_sets[0][0]
+    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id, header)
 
     try:
         scenario_management.update_scenario(

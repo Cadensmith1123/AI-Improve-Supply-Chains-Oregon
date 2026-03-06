@@ -1,6 +1,6 @@
-JWT
-Pandas
-Flask
-Gunicorn
-dotenv
-mysql-connector
+PyJWT
+pandas
+flask
+gunicorn
+python-dotenv
+mysql-connector-python

@@ -12,7 +12,7 @@ CREATE PROCEDURE update_trip_header(
     IN p_run_date DATE,
     IN p_current_gas_price DECIMAL(6,3),
     IN p_total_revenue DECIMAL(12,2),
-    IN p_depreciation DECIMAL(5,3),
+    IN p_depreciation DECIMAL(10,3),
     IN p_daily_insurance DECIMAL(10,2),
     IN p_daily_maintenance DECIMAL(10,2)
 )
@@ -29,7 +29,7 @@ BEGIN
     DECLARE v_driver_wage DECIMAL(5,2);
     DECLARE v_driver_load_wage DECIMAL(5,2);
     DECLARE v_vehicle_mpg DECIMAL(4,1);
-    DECLARE v_depreciation DECIMAL(5,3);
+    DECLARE v_depreciation DECIMAL(10,3);
     DECLARE v_daily_insurance DECIMAL(10,2);
     DECLARE v_daily_maintenance DECIMAL(10,2);
     DECLARE v_load_time INT;
