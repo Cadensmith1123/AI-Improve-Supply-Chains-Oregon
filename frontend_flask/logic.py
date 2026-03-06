@@ -279,7 +279,7 @@ def get_trip_length(header):
     if not miles_est or not time_est:
         miles_est = 0.0
         time_est = 0.0
-    return round(miles_est,2), round(time_est,2)
+    return round(miles_est*2,2), round(time_est*2,2)
 
 
 def calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles):
