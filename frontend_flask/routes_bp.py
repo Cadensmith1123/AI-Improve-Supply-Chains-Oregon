@@ -358,11 +358,14 @@ def route_edit_post(route_id: int):
         sales_amount=data["sales_amount"],
         vehicle_id=data.get("vehicle_id"),
         driver_id=data.get("driver_id"),
+        gas_price=data.get("gas_price"),
     )
 
     if not ok:
         abort(400)
 
+    if request.referrer and "view" in request.referrer:
+        return redirect(url_for("routes.route_view_get", route_id=route_id))
     return redirect(url_for("routes.routes_list"))
 
 

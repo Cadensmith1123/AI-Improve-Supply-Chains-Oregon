@@ -37,8 +37,15 @@ def product_new_post():
         return render_template("product_form.html", mode="new", product=None, form_values=form_values, errors=errors), 400
 
     ok, err, new_id = db.create_product(**data)
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if not ok:
+        if is_ajax:
+            return jsonify({"success": False, "message": err}), 400
         abort(400)
+    if is_ajax:
+        return jsonify({"success": True, "id": new_id, "name": data.get("product_name", "")})
+
     return redirect(request.form.get("next") or url_for("products.products_list"))
 
 @products_bp.post("/products/<product_id>/delete")

@@ -30,9 +30,14 @@ def vehicle_new_post():
         maintenance_cost=maintenance_cost,
         storage_type=storage_type
     )
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if not ok:
-        print(err)
+        if is_ajax:
+            return jsonify({"success": False, "message": err}), 400
         abort(400)
+    if is_ajax:
+        return jsonify({"success": True, "id": new_id, "name": vehicle_name})
 
     return redirect(url_for("routes.routes_list"))
 
@@ -101,8 +106,14 @@ def location_new_post():
         avg_load_minutes=load_mins,
         avg_unload_minutes=unload_mins
     )
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if not ok:
+        if is_ajax:
+            return jsonify({"success": False, "message": err}), 400
         abort(400)
+    if is_ajax:
+        return jsonify({"success": True, "id": new_id, "name": name})
 
     return redirect(url_for("routes.routes_list"))
 
@@ -154,8 +165,15 @@ def driver_new_post():
         abort(400)
 
     ok, err, new_id = db.create_driver(name, hourly_drive_wage, hourly_load_wage)
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     if not ok:
+        if is_ajax:
+            return jsonify({"success": False, "message": err}), 400
         abort(400)
+    if is_ajax:
+        return jsonify({"success": True, "id": new_id, "name": name})
+
     return redirect(url_for("routes.routes_list"))
 
 
