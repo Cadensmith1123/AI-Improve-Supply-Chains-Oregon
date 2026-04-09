@@ -652,6 +652,7 @@ def update_route(
     sales_amount: float,
     vehicle_id: Optional[int] = None,
     driver_id: Optional[int] = None,
+    gas_price: Optional[float] = None,
 ):
     """
     Updates an existing route's definition and financial scenario.
@@ -693,7 +694,8 @@ def update_route(
             driver_id=driver_id,
             depreciation=depreciation,
             daily_insurance=daily_insurance,
-            daily_maintenance=daily_maintenance
+            daily_maintenance=daily_maintenance,
+            current_gas_price=gas_price
         )
 
         raw_scenarios = read.view_scenarios_scoped(ids=route_id)
@@ -725,6 +727,8 @@ def recalculate_route_costs(route_id: int):
         result_sets = scenario_management.get_complete_route_details(route_id)
         header = result_sets[0][0]
         dep, ins, maint = _calculate_vehicle_costs(vehicle_id, header)
+
+        print(f"DEBUG dep={dep}, ins={ins}, maint={maint}") 
 
         # If no vehicle, default costs to 0.0
         scenario_management.refresh_scenario(route_id, dep or 0.0, ins or 0.0, maint or 0.0)

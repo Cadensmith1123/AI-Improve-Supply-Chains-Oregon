@@ -358,6 +358,7 @@ def route_edit_post(route_id: int):
         sales_amount=data["sales_amount"],
         vehicle_id=data.get("vehicle_id"),
         driver_id=data.get("driver_id"),
+        gas_price=data.get("gas_price"),
     )
 
     if not ok:
