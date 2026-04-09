@@ -5,7 +5,7 @@
         <div class="modal-title">Manage Vehicles</div>
         <button class="x" data-close>&times;</button>
       </div>
-      <form method="post" action="/vehicles/new" id="vehicleForm">
+      <form method="post" action="/vehicles/new" id="vehicleForm" onsubmit="return handleQuickCreateSubmit(this)">
         <div class="modal-body">
           <div class="field">
             <label>Select Vehicle</label>

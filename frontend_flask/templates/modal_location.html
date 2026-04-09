@@ -5,7 +5,7 @@
         <div class="modal-title">Manage Locations</div>
         <button class="x" data-close>&times;</button>
       </div>
-      <form method="post" action="/locations/new" id="locationForm">
+      <form method="post" action="/locations/new" id="locationForm" onsubmit="return handleQuickCreateSubmit(this)">
         <div class="modal-body">
           <div class="field">
             <label>Select Location to Edit</label>

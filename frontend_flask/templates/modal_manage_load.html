@@ -29,7 +29,7 @@
         <form method="post" id="addToLoadForm" action="" novalidate>
           <div class="grid2">
             <div class="field">
-              <label>Product</label>
+              <label>Product <button type="button" class="btn small" onclick="openQuickCreate('modal-product','loadProductSelect')" title="Add new product">+</button></label>
               <select name="product_id" id="loadProductSelect">
                 <option value="">-- Select --</option>
                 {% for p in products %}

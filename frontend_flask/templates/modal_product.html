@@ -5,7 +5,7 @@
         <div class="modal-title">Manage Products</div>
         <button class="x" data-close>&times;</button>
       </div>
-      <form method="post" action="/products/new" id="productForm">
+      <form method="post" action="/products/new" id="productForm" onsubmit="return handleQuickCreateSubmit(this)">
         <input type="hidden" name="next" value="{{ request.url }}">
         <div class="modal-body">
           <div class="field">

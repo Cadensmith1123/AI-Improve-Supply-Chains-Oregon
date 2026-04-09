@@ -241,6 +241,9 @@
       }
       el.style.display = "none";
     }
+    </script>
+    <script src="{{ url_for('static', filename='quick-create.js') }}"></script>
+    <script>
 
     document.querySelectorAll("[data-open]").forEach(b => {
       b.addEventListener("click", () => openModal(b.dataset.open));

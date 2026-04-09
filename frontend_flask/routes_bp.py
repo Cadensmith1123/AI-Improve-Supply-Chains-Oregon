@@ -364,6 +364,8 @@ def route_edit_post(route_id: int):
     if not ok:
         abort(400)
 
+    if request.referrer and "view" in request.referrer:
+        return redirect(url_for("routes.route_view_get", route_id=route_id))
     return redirect(url_for("routes.routes_list"))
 
 

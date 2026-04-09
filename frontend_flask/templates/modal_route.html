@@ -58,7 +58,7 @@
 
           <div class="grid2">
             <div class="field">
-              <label>Start Location (required)</label>
+              <label>Start Location (required) <button type="button" class="btn small" onclick="openQuickCreate('modal-location','rtOrigin')" title="Add new location">+</button></label>
               <select
                 name="origin_location_id"
                 id="rtOrigin"
@@ -78,7 +78,7 @@
             </div>
 
             <div class="field">
-              <label>Destination Location (required)</label>
+              <label>Destination Location (required) <button type="button" class="btn small" onclick="openQuickCreate('modal-location','rtDest')" title="Add new location">+</button></label>
               <select
                 name="dest_location_id"
                 id="rtDest"
@@ -101,7 +101,7 @@
           <div class="modal-subtitle">Resources (optional)</div>
           <div class="grid2">
             <div class="field">
-              <label>Vehicle</label>
+              <label>Vehicle <button type="button" class="btn small" onclick="openQuickCreate('modal-vehicle','rtVehicle')" title="Add new vehicle">+</button></label>
               <select name="vehicle_id" id="rtVehicle" class="{{ 'error-input' if new_route_errors.get('vehicle_id') else '' }}">
                 <option value="">-- Unassigned --</option>
                 {% for v in vehicles %}
@@ -113,7 +113,7 @@
             </div>
 
             <div class="field">
-              <label>Driver</label>
+              <label>Driver <button type="button" class="btn small" onclick="openQuickCreate('modal-driver','rtDriver')" title="Add new driver">+</button></label>
               <select name="driver_id" id="rtDriver" class="{{ 'error-input' if new_route_errors.get('driver_id') else '' }}">
                 <option value="">-- Unassigned --</option>
                 {% for d in drivers %}
