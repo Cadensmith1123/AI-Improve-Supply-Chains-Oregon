@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify, current_app, render_template, redirect, url_for
 from auth.tokens import mint_access_token, verify_access_token
 from auth.passwords import verify_password, DUMMY_HASH
-from auth.user_management import get_user_by_username, create_user
+from auth.user_management import get_user_by_username, create_user, get_user_totp_secret, set_user_totp_secret, set_totp_confirmed
+from auth.totp import generate_secret
+
 
 """
 Handles the API endpoints for Authentication (Login/Register).
@@ -64,3 +66,23 @@ def register():
     except Exception as e:
         current_app.logger.error(f"Registration Error: {e}")
         return jsonify({"error": "An unexpected error occurred."}), 500
+    
+
+@auth_bp.route("/totp/setup", methods=["GET"])
+def totp_setup():
+    secret = get_user_totp_secret(g.user_id)
+    if not secret:
+        secret = generate_secret()
+        set_user_totp_secret(g.user_id, secret)
+    return render_template("totp_setup.html", secret=secret)
+
+
+@auth_bp.post("/totp/confirm")
+def totp_confirm():
+    code = request.form.get("code", "").strip()
+    secret = get_user_totp_secret(g.user_id)
+    if verify_code(secret, code):
+        set_totp_confirmed(g.user_id, True)
+        return redirect(url_for("routes.routes_list"))
+    return render_template("totp_setup.html", secret=secret,
+                           error="Invalid code. Make sure your authenticator shows a current code and try again.")
