@@ -25,7 +25,8 @@ app.config.update({
     'JWT_SECRET': os.getenv("JWT_SECRET", "dev-secret-key"),
     'JWT_ACCESS_TTL_SECONDS': int(os.getenv("JWT_ACCESS_TTL_SECONDS", 3600)),
     'JWT_ISSUER': os.getenv("JWT_ISSUER", "local-food-app"),
-    'JWT_AUDIENCE': os.getenv("JWT_AUDIENCE", "local-food-api")
+    'JWT_AUDIENCE': os.getenv("JWT_AUDIENCE", "local-food-api"),
+    'SECRET_KEY': os.getenv("SECRET_KEY", "dev-secret-key")
 })
 
 # Register Blueprints
