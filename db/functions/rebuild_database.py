@@ -19,7 +19,8 @@ SQL_FILES = [
     "db/procedures/generate_test_data.sql",
     "db/procedures/refresh_trip_snapshots.sql",
     "db/schema/auth_SCHEMA.sql",
-    "db/procedures/auth_procs.sql"
+    "db/procedures/auth_procs.sql",
+    "db/procedures/auth_totp_procs.sql"
 ]
 
 def get_db_connection():
