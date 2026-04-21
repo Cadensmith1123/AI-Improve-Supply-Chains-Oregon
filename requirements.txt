@@ -4,3 +4,6 @@ flask
 gunicorn
 python-dotenv
 mysql-connector-python
+pyotp
+itsdangerous
+qrcode[pil]

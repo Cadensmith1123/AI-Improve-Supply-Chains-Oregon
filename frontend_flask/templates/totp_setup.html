@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set Up Authenticator - Local Food Supply Chain</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <h2>Set Up Your Authenticator</h2>
+
+        {% if error %}
+            <div class="error-msg" style="display:block;">{{ error }}</div>
+        {% endif %}
+
+        <p class="mb-12">Scan this QR code with your authenticator app:</p>
+
+        <div class="totp-qr">
+            <img src="data:image/png;base64,{{ qr_base64 }}" alt="TOTP QR Code">
+        </div>
+
+        <ol class="totp-instructions">
+            <li>Open your authenticator app</li>
+            <li>Tap <strong>+</strong> or <strong>Add account</strong></li>
+            <li>Choose <strong>Scan QR code</strong></li>
+            <li>Scan the QR code above</li>
+        </ol>
+
+        <p class="text-muted-sm">Or enter this key manually:</p>
+        <div class="totp-secret">{{ secret }}</div>
+        <button type="button" id="copyBtn" class="copy-btn">Copy key</button>
+
+        <ol class="totp-instructions">
+            <li>Choose <strong>Enter a setup key</strong></li>
+            <li>Account name: <strong>Choose an appropriate label (Tip: include your username)</strong></li>
+            <li>Key: paste the key above</li>
+            <li>Select: <strong>Time-based</strong> (default)</li>
+        </ol>
+
+        <form method="post" action="{{ url_for('auth.totp_confirm') }}">
+            <div class="form-group">
+                <label for="code">Enter the 6-digit code from your app to confirm</label>
+                <input type="text" id="code" name="code" required autofocus
+                       maxlength="6" pattern="[0-9]{6}" inputmode="numeric"
+                       placeholder="000000" autocomplete="one-time-code">
+            </div>
+            <button type="submit">Confirm</button>
+        </form>
+
+        <div class="auth-footer"></div>
+    </div>
+
+    <script>
+        document.getElementById('copyBtn').addEventListener('click', function() {
+            navigator.clipboard.writeText('{{ secret }}').then(() => {
+                this.textContent = 'Copied!';
+                setTimeout(() => { this.textContent = 'Copy key'; }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>

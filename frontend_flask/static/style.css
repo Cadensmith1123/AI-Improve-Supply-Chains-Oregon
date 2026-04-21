@@ -464,6 +464,54 @@ select:focus {
   border: 1px solid #c3e6cb;
 }
 
+/* TOTP Setup */
+.totp-qr {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.totp-qr img {
+  width: 200px;
+  height: 200px;
+}
+
+.totp-secret {
+  background: #f4f4f5;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+  font-family: monospace;
+  font-size: 18px;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.totp-instructions {
+  text-align: left;
+  margin-bottom: 20px;
+  padding-left: 20px;
+  line-height: 1.8;
+  font-size: 14px;
+}
+
+.copy-btn {
+  margin-bottom: 20px;
+  font-size: 13px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.text-muted-sm {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
 /* Map View */
 .map-body {
   position: relative;

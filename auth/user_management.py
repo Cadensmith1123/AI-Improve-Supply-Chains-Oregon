@@ -87,3 +87,30 @@ def delete_user(tenant_id: int, user_id: int, conn=None) -> List[Dict[str, Any]]
 def get_user_by_username(username: str, conn=None) -> Optional[Dict[str, Any]]:
     rows = _execute_proc("get_user_by_username", [username], conn)
     return rows[0] if rows else None
+
+
+def get_user_totp_secret(user_id):
+    rows = _execute_proc("get_user_totp", [user_id])
+    return rows[0]["totp_secret"] if rows else None
+
+
+def set_totp_secret(user_id, secret):
+    _execute_proc("set_totp_secret", [user_id, secret])
+
+
+def set_totp_confirmed(user_id, confirmed):
+    _execute_proc("set_totp_confirmed", [user_id, confirmed])
+
+
+def get_user_for_reset(username):
+    rows = _execute_proc("get_user_for_reset", [username])
+    return rows[0] if rows else None
+
+
+def update_user_password(user_id, password_hash):
+    _execute_proc("update_user_password", [user_id, password_hash])
+
+
+def get_user_totp(user_id):
+    rows = _execute_proc("get_user_totp", [user_id])
+    return rows[0] if rows else None
