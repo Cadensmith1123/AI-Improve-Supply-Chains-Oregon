@@ -41,6 +41,19 @@
     </div>
 
     <div class="card">
+      <div class="k">Route Map</div>
+      <div class="map-container">
+        <iframe
+        src="{{ url_for('map.route_map_embed', route_id=route.route_id) }}"
+        class="map-iframe"
+        loading="lazy"
+        referrerpolicy="no-referrer-when-downgrade"
+        allowfullscreen
+      ></iframe>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="grid2">
         <div>
           <div class="flex flex-between items-center">
@@ -148,18 +161,7 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="k">Route Map</div>
-      <div class="map-container">
-        <iframe
-        src="{{ url_for('map.route_map_embed', route_id=route.route_id) }}"
-        class="map-iframe"
-        loading="lazy"
-        referrerpolicy="no-referrer-when-downgrade"
-        allowfullscreen
-      ></iframe>
-      </div>
-    </div>
+    
 
     <div class="card">
       <div class="flex flex-between items-center mb-10">
