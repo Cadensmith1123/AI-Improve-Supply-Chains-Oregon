@@ -63,3 +63,21 @@ def verify_reset_token(token, max_age=600):  # 10 minutes
         return data["uid"]
     except Exception:
         return None
+
+
+#for resetting anonymous user JWT
+def sign_recovery_cookie(user_id, tenant_id):
+    s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    return s.dumps({"uid": user_id, "tid": tenant_id, "purpose": "anon_recovery"})
+
+
+def verify_recovery_cookie(token, max_age = None):
+    max_age = max_age or current_app.config["ANON_RECOVERY_TTL_SECONDS"]
+    s = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    try:
+        data = s.loads(token, max_age=max_age)
+        if data.get("purpose") != "anon_recovery":
+            return None
+        return data["uid"], data["tid"]
+    except Exception:
+        return None

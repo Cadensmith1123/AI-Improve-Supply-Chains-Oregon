@@ -17,10 +17,15 @@ SQL_FILES = [
     "db/procedures/get_complete_route_details.sql",
     #"db/procedures/get_planning_assets.sql",
     "db/procedures/generate_test_data.sql",
-    "db/procedures/refresh_trip_snapshots.sql",
+    "db/procedures/refresh_trip_snapshots.sql"
+]
+
+AUTH_SQL_FILES = [
     "db/schema/auth_SCHEMA.sql",
     "db/procedures/auth_procs.sql",
-    "db/procedures/auth_totp_procs.sql"
+    "db/procedures/auth_totp_procs.sql",
+    "db/procedures/anon_procs.sql"
+
 ]
 
 def get_db_connection():
@@ -31,6 +36,17 @@ def get_db_connection():
         port=os.getenv("DB_PORT"),
         database=os.getenv("DB_NAME", 'local_food_db') # Default to local_food_db if not set
     )
+
+
+def get_auth_db_connection():
+    return mysql.connector.connect(
+        user=os.getenv("AUTH_DB_USER"),
+        password=os.getenv("AUTH_DB_PASSWORD"),
+        host=os.getenv("AUTH_DB_HOST"),
+        port=os.getenv("AUTH_DB_PORT"),
+        database=os.getenv("AUTH_DB_NAME", 'auth_db') # Default to auth_db if not set
+    )
+
 
 def execute_sql_file(conn, file_path):
     print(f"Executing {file_path}...")
@@ -78,14 +94,22 @@ def execute_sql_file(conn, file_path):
 def main():
     try:
         conn = get_db_connection()
+        auth_conn = get_auth_db_connection()
         
         for file_path in SQL_FILES:
             if os.path.exists(file_path):
                 execute_sql_file(conn, file_path)
             else:
                 print(f"Warning: File not found {file_path}")
+
+        for file_path in AUTH_SQL_FILES:
+            if os.path.exists(file_path):
+                execute_sql_file(auth_conn, file_path)
+            else:
+                print(f"Warning: File not found {file_path}")
         
         conn.commit()
+        auth_conn.commit()
         print("Database rebuild complete.")
         
     except mysql.connector.Error as err:
@@ -93,6 +117,8 @@ def main():
     finally:
         if 'conn' in locals() and conn.is_connected():
             conn.close()
+        if 'auth_conn' in locals() and auth_conn.is_connected():
+            auth_conn.close()
 
 if __name__ == "__main__":
     main()

@@ -20,7 +20,8 @@ CREATE TABLE users (
   updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   totp_secret    VARCHAR(32) DEFAULT NULL,
   totp_confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+  last_active    DATETIME DEFAULT CURRENT_TIMESTAMP,
 
 
-  CONSTRAINT fk_users_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id)
+  CONSTRAINT fk_users_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 );
