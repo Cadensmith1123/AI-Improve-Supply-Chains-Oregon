@@ -17,7 +17,8 @@ SQL_FILES = [
     "db/procedures/get_complete_route_details.sql",
     #"db/procedures/get_planning_assets.sql",
     "db/procedures/generate_test_data.sql",
-    "db/procedures/refresh_trip_snapshots.sql"
+    "db/procedures/refresh_trip_snapshots.sql",
+    "db/procedures/tenant_cleanup_procs.sql"
 ]
 
 AUTH_SQL_FILES = [

@@ -1,13 +1,20 @@
 DELIMITER $$
 
 DROP PROCEDURE IF EXISTS clean_anon_users $$
-CREATE PROCEDURE clean_anon_users(IN p_max_age_days INT)
+CREATE PROCEDURE clean_anon_users(IN p_max_age_seconds INT)
 BEGIN
-DELETE FROM tenants
-WHERE tenant_id IN (
+    DROP TEMPORARY TABLE IF EXISTS _deleted_tenants;
+    CREATE TEMPORARY TABLE _deleted_tenants (tenant_id BIGINT);
+
+    INSERT INTO _deleted_tenants (tenant_id)
     SELECT tenant_id FROM users
-    WHERE role = 'Anonymous' AND last_active < NOW() - INTERVAL p_max_age_days DAY
-);
+    WHERE role = 'Anonymous'
+    AND last_active < NOW() - INTERVAL p_max_age_seconds SECOND;
+
+    DELETE FROM tenants
+    WHERE tenant_id IN (SELECT tenant_id FROM _deleted_tenants);
+
+    SELECT tenant_id FROM _deleted_tenants;
 END $$
 
 DROP PROCEDURE IF EXISTS update_user_activity $$

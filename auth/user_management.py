@@ -134,11 +134,18 @@ def generate_email(username):
 
 
 def create_anonymous_user(conn=None):
-    password = generate_password()
-    username = generate_username()
-    email = generate_email(username)
-    user_id = create_user(username,  password, email, role="Anonymous", conn=conn)
-    user = get_user_by_username(username, conn=conn)
+    try:
+        password = generate_password()
+        username = generate_username()
+        email = generate_email(username)
+        user_id = create_user(username,  password, email, role="Anonymous", conn=conn)
+        user = get_user_by_username(username, conn=conn)
+    except ValueError:
+        password = generate_password(18)
+        username = generate_username(16)
+        email = generate_email(username)
+        user_id = create_user(username,  password, email, role="Anonymous", conn=conn)
+        user = get_user_by_username(username, conn=conn)
     return user_id, user["tenant_id"]
 
 
