@@ -1,9 +1,9 @@
 from flask import Blueprint, request, jsonify, current_app, render_template, redirect, url_for, g, make_response
 from auth.passwords import verify_password, DUMMY_HASH, hash_password
-from auth.user_management import get_user_by_username, create_user, set_totp_secret, get_user_totp_secret
-from auth.user_management import set_totp_confirmed, get_user_for_reset, update_user_password
+from auth.user_management import get_user_by_username, create_user, set_totp_secret, get_user_totp_secret, upgrade_anonymous_user
+from auth.user_management import set_totp_confirmed, get_user_for_reset, update_user_password, create_anonymous_user
 from auth.totp import generate_secret, verify_code, get_totp_uri, generate_qr_base64
-from auth.tokens import mint_access_token, verify_access_token, sign_reset_token, verify_reset_token
+from auth.tokens import mint_access_token, verify_access_token, sign_reset_token, verify_reset_token, sign_recovery_cookie, verify_recovery_cookie
 from collections import defaultdict
 from time import time
 
@@ -49,9 +49,20 @@ def login():
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
+    anon_user_id  = None
+    token = request.cookies.get("token")
+    if token:
+        try:
+            payload = verify_access_token(token)
+            if payload.get('anon'):
+                anon_user_id = payload.get('sub')
+            else:
+                if request.method == "GET":
+                    return redirect(url_for('home'))
+        except Exception:
+            pass
+
     if request.method == "GET":
-        if request.cookies.get('token'):
-            return redirect(url_for('home'))
         return render_template('register.html')
 
     # POST — traditional form submission
@@ -65,11 +76,15 @@ def register():
                                form_data={"username": username, "email": email})
 
     try:
-        user_id = create_user(username=username, password=password, email=email)
-        if not user_id:
-            return render_template('register.html',
-                                   error="Failed to create user.",
-                                   form_data={"username": username, "email": email})
+        if anon_user_id:
+            upgrade_anonymous_user(anon_user_id, username, email, password)
+            user_id = anon_user_id
+        else:
+            user_id = create_user(username=username, password=password, email=email)
+            if not user_id:
+                return render_template('register.html',
+                                       error="Failed to create user.",
+                                       form_data={"username": username, "email": email})
 
         # Look up the new user to get tenant_id
         user = get_user_by_username(username)
@@ -82,6 +97,8 @@ def register():
         token = mint_access_token(user_id=user["user_id"], tenant_id=user["tenant_id"], username=username)
         resp = make_response(redirect(url_for("auth.totp_setup")))
         resp.set_cookie("token", token, httponly=True, samesite="Lax", max_age=3600)
+        if anon_user_id:
+            resp.delete_cookie("anon_recovery")
         return resp
 
     except ValueError as e:
@@ -176,6 +193,26 @@ def reset_password_complete():
     update_user_password(user_id, hashed)
     return redirect(url_for("auth.login"))
 
+
+@auth_bp.get("/try")
+def try_anonymous():
+    recovery = request.cookies.get("anon_recovery")
+    if recovery:
+        result = verify_recovery_cookie(recovery)
+        if result:
+            user_id, tenant_id = result
+            token = mint_access_token(user_id=user_id, tenant_id=tenant_id, is_anon=True)
+            resp = make_response(redirect(url_for("routes.routes_list")))
+            resp.set_cookie("token", token, httponly=True, samesite="Lax", max_age=current_app.config["JWT_ACCESS_TTL_SECONDS"])
+            return resp
+
+    user_id, tenant_id = create_anonymous_user()
+    token = mint_access_token(user_id=user_id, tenant_id=tenant_id, is_anon=True)
+    recovery = sign_recovery_cookie(user_id, tenant_id)
+    resp = make_response(redirect(url_for("routes.routes_list")))
+    resp.set_cookie("token", token, httponly=True, samesite="Lax",  max_age=current_app.config["JWT_ACCESS_TTL_SECONDS"])
+    resp.set_cookie("anon_recovery", recovery, httponly=True, samesite="Lax",  max_age=current_app.config["ANON_RECOVERY_TTL_SECONDS"])
+    return resp
 
 
 def check_reset_rate(username):
