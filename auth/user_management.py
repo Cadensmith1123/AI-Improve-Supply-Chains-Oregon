@@ -1,4 +1,6 @@
 import mysql.connector
+import secrets
+import string
 from contextlib import contextmanager, closing
 from typing import Optional, List, Dict, Any
 from db.functions.connect import get_auth_db
@@ -114,3 +116,43 @@ def update_user_password(user_id, password_hash):
 def get_user_totp(user_id):
     rows = _execute_proc("get_user_totp", [user_id])
     return rows[0] if rows else None
+
+
+def generate_username(length=12):
+    username = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(length))
+    return username
+
+
+def generate_password(length=16):
+    password = string.ascii_letters + string.digits + "!@#$%^&*-_=+"
+    password = ''.join(secrets.choice(password) for _ in range(length))
+    return password
+
+
+def generate_email(username):
+    return f"{username}@example.invalid"
+
+
+def create_anonymous_user(conn=None):
+    try:
+        password = generate_password()
+        username = generate_username()
+        email = generate_email(username)
+        user_id = create_user(username,  password, email, role="Anonymous", conn=conn)
+        user = get_user_by_username(username, conn=conn)
+    except ValueError:
+        password = generate_password(18)
+        username = generate_username(16)
+        email = generate_email(username)
+        user_id = create_user(username,  password, email, role="Anonymous", conn=conn)
+        user = get_user_by_username(username, conn=conn)
+    return user_id, user["tenant_id"]
+
+
+def update_user_activity(user_id, conn = None):
+    _execute_proc("update_user_activity", [user_id], conn)
+
+
+def upgrade_anonymous_user(user_id, username, email, password, conn=None):
+    hashed_pw = hash_password(password)
+    _execute_proc("upgrade_anonymous_user", [user_id, username, email, hashed_pw], conn)
