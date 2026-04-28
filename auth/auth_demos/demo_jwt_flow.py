@@ -6,7 +6,7 @@ import re
 
 # DB Functions
 from auth import user_management
-from db.functions.tennant_functions import scoped_create, scoped_read, scoped_delete
+from db.functions.tenant_functions import scoped_create, scoped_read, scoped_delete
 import db.functions.connect
 
 # Auth Initialization

@@ -1,6 +1,6 @@
 from flask import g
 from db.functions.connect import get_db
-from db.functions.tennant_functions import scoped_read as read, scoped_create as create, scoped_update as update, scoped_delete as delete
+from db.functions.tenant_functions import scoped_read as read, scoped_create as create, scoped_update as update, scoped_delete as delete
 from decimal import Decimal #used to combat floating point errors
 from datetime import date
 
