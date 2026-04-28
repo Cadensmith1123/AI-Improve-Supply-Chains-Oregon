@@ -36,7 +36,23 @@ def install_auth_middleware(app):
                 totp_data = get_user_totp(g.user_id)
                 if not totp_data or not totp_data.get('totp_confirmed'):
                     return redirect(url_for('auth.totp_setup'))
-        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        # check if the expired JWT is from anon account or from logged in account
+        except jwt.ExpiredSignatureError:
+            try:
+                stale = jwt.decode(
+                    token, app.config['JWT_SECRET'], 
+                    algorithms=['HS256'],
+                    issuer=app.config['JWT_ISSUER'],
+                    audience=app.config['JWT_AUDIENCE'],
+                    options={"verify_exp": False, "require":["sub"]}
+                )
+            except jwt.InvalidTokenError:
+                return redirect(url_for('logout'))
+            if not stale.get('anon'):
+                # real account don't swap to annon validation
+                return redirect(url_for('logout'))
+            
+            # is anon account so recover from recovery cookie
             recovery = request.cookies.get('anon_recovery')
             if recovery:
                 result = verify_recovery_cookie(recovery)
@@ -49,6 +65,9 @@ def install_auth_middleware(app):
                     g._refresh_session = True
                     return
             return redirect(url_for('logout'))
+        except jwt.InvalidTokenError:
+            return redirect(url_for('logout'))
+
         
     @app.after_request
     def refresh_anonymous_session(response):
