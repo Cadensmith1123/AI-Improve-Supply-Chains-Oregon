@@ -18,6 +18,11 @@ from assets_bp import assets_bp
 from auth_bp import auth_bp
 from auth.middleware import install_auth_middleware
 
+
+
+from csv_template_bp import csv_template_bp
+
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -36,6 +41,7 @@ app.register_blueprint(routes_bp)
 app.register_blueprint(products_bp)
 app.register_blueprint(assets_bp)
 app.register_blueprint(auth_bp, url_prefix="/auth")
+app.register_blueprint(csv_template_bp, url_prefix="/api/import/templates")
 
 # Install Auth Middleware
 install_auth_middleware(app)
