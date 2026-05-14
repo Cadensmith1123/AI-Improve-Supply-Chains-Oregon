@@ -230,22 +230,4 @@ BEGIN
     END IF;
 END $$
 
-CREATE TRIGGER trg_manifest_delete AFTER DELETE ON manifest_items
-FOR EACH ROW
-BEGIN
-    -- Restore Supply
-    IF OLD.supply_id IS NOT NULL THEN
-        UPDATE supply 
-        SET quantity_available = quantity_available + OLD.quantity_loaded
-        WHERE supply_id = OLD.supply_id AND tenant_id = OLD.tenant_id;
-    END IF;
-
-    -- Restore Demand
-    IF OLD.demand_id IS NOT NULL THEN
-        UPDATE demand 
-        SET quantity_needed = quantity_needed + OLD.quantity_loaded
-        WHERE demand_id = OLD.demand_id AND tenant_id = OLD.tenant_id;
-    END IF;
-END $$
-
 DELIMITER ;

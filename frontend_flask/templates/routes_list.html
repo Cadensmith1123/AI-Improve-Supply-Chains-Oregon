@@ -31,6 +31,7 @@
             <th>products</th>
             <th>Revenue</th>
             <th>total cost</th>
+            <th>net profit</th>
             <th>actions</th>
           </tr>
         </thead>
@@ -89,6 +90,10 @@
                 <div>Items: ${{ "%.2f"|format(r.item_revenue) }}</div>
               </td>
               <td>${{ "%.2f"|format(r.total_cost) }}</td>
+
+              <td class="{% if r.net_trip_profit > 0 %}surplus{% elif r.net_trip_profit < 0 %}deficit{% endif %}">
+                {% if r.net_trip_profit > 0 %}+{% endif %}${{ "%.2f"|format(r.net_trip_profit) }}
+              </td>
 
               <td>
   <div class="stack">

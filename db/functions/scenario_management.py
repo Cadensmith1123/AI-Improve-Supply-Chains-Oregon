@@ -246,11 +246,11 @@ def update_manifest_item(
         scenario_id,
         item_name,
         quantity_loaded,
-        cost_per_item=None,
-        items_per_unit=None,
-        unit_weight=None,
-        unit_volume=None,
-        price_per_item=None,
+        snapshot_cost_per_item=None,
+        snapshot_items_per_unit=None,
+        snapshot_unit_weight=None,
+        snapshot_unit_volume=None,
+        snapshot_price_per_item=None,
         conn=None
 ):
     """
@@ -261,11 +261,11 @@ def update_manifest_item(
         scenario_id=scenario_id,
         item_name=item_name,
         quantity_loaded=quantity_loaded,
-        snapshot_cost_per_item=cost_per_item,
-        snapshot_items_per_unit=items_per_unit,
-        snapshot_unit_weight=unit_weight,
-        snapshot_unit_volume=unit_volume,
-        snapshot_price_per_item=price_per_item,
+        snapshot_cost_per_item=snapshot_cost_per_item,
+        snapshot_items_per_unit=snapshot_items_per_unit,
+        snapshot_unit_weight=snapshot_unit_weight,
+        snapshot_unit_volume=snapshot_unit_volume,
+        snapshot_price_per_item=snapshot_price_per_item,
         conn=conn
     )
 

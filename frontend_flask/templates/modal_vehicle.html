@@ -16,14 +16,19 @@
           </div>
           <hr class="hr-modal">
 
+          <div class="field">
+            <label>Vehicle Name / ID (required)</label>
+            <input name="vehicle_name" id="vehName" placeholder="e.g., Truck-12" required>
+          </div>
+
           <div class="grid2">
-            <div class="field">
-              <label>Vehicle Name / ID (required)</label>
-              <input name="vehicle_name" id="vehName" placeholder="e.g., Truck-12" required>
-            </div>
             <div class="field">
               <label>Max Weight (lbs)</label>
               <input name="capacity" id="vehCap" placeholder="e.g., 26000">
+            </div>
+            <div class="field">
+              <label>Max Volume (cu ft)</label>
+              <input name="volume" id="vehVol" placeholder="e.g., 1000">
             </div>
           </div>
 
@@ -105,6 +110,7 @@
           document.getElementById("vehName").value = "";
           document.getElementById("vehMpg").value = "";
           document.getElementById("vehCap").value = "";
+          document.getElementById("vehVol").value = "";
           document.getElementById("vehMiles").value = "";
           document.getElementById("vehPrice").value = "";
           document.getElementById("vehSalvage").value = "";
@@ -119,7 +125,8 @@
             form.action = `/vehicles/${v.vehicle_id}/edit`;
             document.getElementById("vehName").value = v.vehicle_name || "";
             document.getElementById("vehMpg").value = v.mpg || "";
-            document.getElementById("vehCap").value = v.max_weight_lbs || ""; // Assuming capacity maps to weight for now
+            document.getElementById("vehCap").value = v.max_weight_lbs || "";
+            document.getElementById("vehVol").value = v.max_volume_cubic_ft || "";
             document.getElementById("vehMiles").value = v.vehicle_estimated_yearly_milage || "";
             document.getElementById("vehPrice").value = v.vehicle_purchase_price || "";
             document.getElementById("vehSalvage").value = v.vehicle_estimated_salvage_value || "";
