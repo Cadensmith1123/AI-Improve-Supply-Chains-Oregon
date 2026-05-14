@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, render_template
 import csv
 import io
 
-from db.functions.tennant_functions import (
+from db.functions.tenant_functions import (
     scoped_read as read,
     scoped_create as create,
     scoped_update as update
