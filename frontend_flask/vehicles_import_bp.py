@@ -110,9 +110,9 @@ def import_vehicles():
         payload = {
             "name": name,
             "mpg": mpg,
-            "vehicle_purchase_price": purchase_price,
-            "vehicle_estimated_yearly_milage": yearly_miles,
-            "vehicle_estimated_salvage_value": salvage_value,
+            "purchase_price": purchase_price,
+            "estimated_yearly_milage": yearly_miles,
+            "estimated_salvage_value": salvage_value,
             "annual_insurance_cost": insurance,
             "annual_maintenance_cost": maintenance,
             "max_weight_lbs": max_weight,
