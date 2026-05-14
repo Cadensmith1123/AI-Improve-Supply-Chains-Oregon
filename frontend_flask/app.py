@@ -21,6 +21,11 @@ from auth.middleware import install_auth_middleware
 
 
 from csv_template_bp import csv_template_bp
+from location_import_bp import location_import_bp
+from products_import_bp import products_import_bp
+from drivers_import_bp import drivers_import_bp
+from vehicles_import_bp import vehicles_import_bp
+from routes_import_bp import routes_import_bp
 
 
 load_dotenv()
@@ -42,6 +47,12 @@ app.register_blueprint(products_bp)
 app.register_blueprint(assets_bp)
 app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(csv_template_bp, url_prefix="/api/import/templates")
+
+app.register_blueprint(location_import_bp)
+app.register_blueprint(products_import_bp)  
+app.register_blueprint(drivers_import_bp)
+app.register_blueprint(vehicles_import_bp)
+app.register_blueprint(routes_import_bp)
 
 # Install Auth Middleware
 install_auth_middleware(app)
