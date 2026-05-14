@@ -1,5 +1,5 @@
 from typing import Optional
-from db.functions.tennant_functions import (
+from db.functions.tenant_functions import (
     scoped_read as read, 
     scoped_create as create, 
     scoped_update as update, 
