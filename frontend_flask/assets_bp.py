@@ -12,6 +12,7 @@ def vehicle_new_post():
     vehicle_name = (request.form.get("vehicle_name") or "").strip()
     mpg = (request.form.get("mpg") or "").strip()
     capacity = (request.form.get("capacity") or "").strip()
+    volume = (request.form.get("volume") or "").strip()
     purchase_price = (request.form.get("purchase_price") or "").strip()
     yearly_mileage = (request.form.get("yearly_mileage") or "").strip()
     salvage_value = (request.form.get("salvage_value") or "").strip()
@@ -23,6 +24,7 @@ def vehicle_new_post():
         vehicle_name=vehicle_name,
         mpg=mpg,
         capacity=capacity,
+        volume=volume,
         purchase_price=purchase_price,
         yearly_mileage=yearly_mileage,
         salvage_value=salvage_value,
@@ -47,6 +49,7 @@ def vehicle_edit_post(vehicle_id: int):
     vehicle_name = (request.form.get("vehicle_name") or "").strip()
     mpg = (request.form.get("mpg") or "").strip()
     capacity = (request.form.get("capacity") or "").strip()
+    volume = (request.form.get("volume") or "").strip()
     purchase_price = (request.form.get("purchase_price") or "").strip()
     yearly_mileage = (request.form.get("yearly_mileage") or "").strip()
     salvage_value = (request.form.get("salvage_value") or "").strip()
@@ -55,10 +58,11 @@ def vehicle_edit_post(vehicle_id: int):
     storage_type = (request.form.get("storage_type") or "Dry").strip()
 
     ok, err = db.update_vehicle(
-        vehicle_id=vehicle_id, 
-        vehicle_name=vehicle_name, 
-        mpg=mpg, 
+        vehicle_id=vehicle_id,
+        vehicle_name=vehicle_name,
+        mpg=mpg,
         capacity=capacity,
+        volume=volume,
         purchase_price=purchase_price,
         yearly_mileage=yearly_mileage,
         salvage_value=salvage_value,

@@ -69,6 +69,10 @@ def to_decimal(val, default="0"):
     except Exception:
         return Decimal(default)
 
+
+def safe_div(num, denom):
+    return round(num/denom, 4) if denom > 0 else 0.0
+
 # =============================================================================
 # VALIDATION
 # =============================================================================
@@ -424,8 +428,8 @@ def calculate_trip_costs(header, items, totals=None):
         "profit_est_entered": round(profit_vs_entered, 2),
         "profit_est_calculated": round(profit_vs_calculated, 2),
 
-        "margin_est_entered": round((profit_vs_entered / entered_revenue) if entered_revenue else 0, 4),
-        "margin_est_calculated": round((profit_vs_calculated / calculated_revenue) if calculated_revenue else 0, 4),
+        "margin_est_entered": round((profit_vs_entered / entered_revenue * 100) if entered_revenue else 0, 2),
+        "margin_est_calculated": round((profit_vs_calculated / calculated_revenue * 100) if calculated_revenue else 0, 2),
         "total_distance_miles": round(miles_est, 1),
 
         "total_cost": round(total_cost_est, 2)
@@ -514,3 +518,96 @@ def generate_csv_export(data_list, columns=None):
             df = df[valid_cols]
 
     return df.to_csv(index=False)
+
+def calculate_per_product_margin(manifest):
+    """
+    Per-line gross margin = unit_price - cost_per_item.
+
+    Margin fields are None when cost_per_item was not recorded on the line, so
+    the UI can show a dash instead of misleading 100% margin. No allocation of
+    delivery cost is performed here — delivery is a trip-level common cost.
+    """
+    out = []
+    for m in manifest:
+        raw_cost = m.get("cost_per_item")
+        has_cost = raw_cost not in (None, "")
+
+        if has_cost:
+            unit_price = safe_float(m.get("unit_price"))
+            cost = safe_float(raw_cost)
+            margin_per_item = unit_price - cost
+            line_margin = safe_float(m.get("line_total")) - safe_float(m.get("line_cogs"))
+        else:
+            margin_per_item = None
+            line_margin = None
+
+        out.append({
+            "manifest_item_id": m.get("manifest_item_id"),
+            "margin_per_item": round(margin_per_item, 2) if margin_per_item is not None else None,
+            "line_margin": round(line_margin, 2) if line_margin is not None else None,
+        })
+    return out
+
+
+def calculate_allocated_delivery(manifest, total_delivery_cost, basis="weight"):
+    """
+    Allocates delivery cost across manifest lines by line_weight or line_volume,
+    then divides each line's allocation by its item count to produce a per-item figure.
+
+    If the chosen basis sums to zero (e.g. no weights recorded), every line
+    receives 0 — no fake equal-split, since equal-split would be misleading.
+    """
+    if not manifest:
+        return []
+
+    delivery = safe_float(total_delivery_cost)
+    basis_key = "line_volume" if basis == "volume" else "line_weight"
+    denominator = sum(safe_float(m.get(basis_key)) for m in manifest)
+
+    out = []
+    for m in manifest:
+        line_basis = safe_float(m.get(basis_key))
+        share = (line_basis / denominator) if denominator > 0 else 0.0
+        allocated_per_line = delivery * share
+        units = safe_float(m.get("quantity")) * safe_float(m.get("items_per_unit"), 1.0)
+        allocated_per_item = (allocated_per_line / units) if units > 0 else 0.0
+
+        raw_cost = m.get("cost_per_item")
+        if raw_cost not in (None, "") and units > 0:
+            breakeven_per_item = safe_float(raw_cost) + allocated_per_item
+        else:
+            breakeven_per_item = None
+
+        out.append({
+            "manifest_item_id": m.get("manifest_item_id"),
+            "allocated_per_item": round(allocated_per_item, 2),
+            "breakeven_per_item": round(breakeven_per_item, 2) if breakeven_per_item is not None else None,
+        })
+    return out
+
+
+def calculate_trip_margin_summary(total_revenue, total_cogs, total_cost, net_profit):
+    """
+    Trip-level go/no-go: total margin, delivery cost, net profit, and a
+    break-even indicator telling the user how much more margin is needed
+    (when negative) or how much of the margin delivery consumes (when positive).
+
+    net_profit is supplied by the caller (typically calculate_trip_costs'
+    profit_est_calculated) so that the displayed Net here always matches the
+    Profit shown elsewhere — no second rounding path.
+    """
+    revenue = safe_float(total_revenue)
+    cogs = safe_float(total_cogs)
+    cost = safe_float(total_cost)
+    net = safe_float(net_profit)
+
+    total_margin = revenue - cogs
+    delivery_cost = cost - cogs
+
+    return {
+        "total_margin": round(total_margin, 2),
+        "delivery_cost": round(delivery_cost, 2),
+        "net_trip_profit": net,
+        "needs_more_margin": round(-net, 2) if net < 0 else 0.0,
+        "delivery_pct_of_margin": round(delivery_cost / total_margin * 100, 2) if total_margin > 0 and net >= 0 else None,
+    }

@@ -60,7 +60,20 @@ def _calculate_route_internals(header, items):
         "total_volume": round(sum(m['line_volume'] for m in manifest), 2)
     }
     costs = logic.calculate_trip_costs(header, items, totals)
-    return manifest, costs
+
+    delivery_cost = costs["total_cost"] - costs["total_cogs"]
+    pricing = {
+        "margin": logic.calculate_per_product_margin(manifest),
+        "trip": logic.calculate_trip_margin_summary(
+            costs["calculated_revenue"], costs["total_cogs"], costs["total_cost"],
+            costs["profit_est_calculated"],
+        ),
+        "allocated_delivery": {
+            "by_weight": logic.calculate_allocated_delivery(manifest, delivery_cost, basis="weight"),
+            "by_volume": logic.calculate_allocated_delivery(manifest, delivery_cost, basis="volume"),
+        },
+    }
+    return manifest, costs, pricing
 
 def _calculate_vehicle_costs(vehicle_id, header):
     """
@@ -140,11 +153,12 @@ def create_driver(name: str, hourly_drive_wage: str, hourly_load_wage: str):
 
 
 def create_vehicle(
-    vehicle_name: str, 
-    mpg: str, 
-    capacity: str, 
-    purchase_price: str = None, 
-    yearly_mileage: str = None, 
+    vehicle_name: str,
+    mpg: str,
+    capacity: str,
+    volume: str = None,
+    purchase_price: str = None,
+    yearly_mileage: str = None,
     salvage_value: str = None,
     insurance_cost: str = None,
     maintenance_cost: str = None,
@@ -152,6 +166,7 @@ def create_vehicle(
 ):
     try:
         cap_val = logic.parse_capacity_string(capacity)
+        vol_val = logic.parse_capacity_string(volume)
 
         new_id = create.add_vehicle_scoped(
             name=vehicle_name,
@@ -162,7 +177,7 @@ def create_vehicle(
             annual_insurance_cost=logic.safe_float(insurance_cost),
             annual_maintenance_cost=logic.safe_float(maintenance_cost),
             max_weight_lbs=cap_val,
-            max_volume_cubic_ft=1000,
+            max_volume_cubic_ft=vol_val,
             storage_type=storage_type
         )
         return True, None, new_id
@@ -226,7 +241,7 @@ def get_all_routes_raw():
         if result_sets and result_sets[0]:
             header = result_sets[0][0]
             items = result_sets[1]
-            _, costs = _calculate_route_internals(header, items)
+            _, costs, _ = _calculate_route_internals(header, items)
             out.append(costs)
     return out
 
@@ -237,7 +252,7 @@ def get_route_raw(route_id):
     if result_sets and result_sets[0]:
         header = result_sets[0][0]
         items = result_sets[1]
-        manifest, costs = _calculate_route_internals(header, items)
+        manifest, costs, _ = _calculate_route_internals(header, items)
         d = {'header': header, 'items': items, 'manifest': manifest}
         d['costs'] = costs
         return d
@@ -311,12 +326,13 @@ def update_driver(driver_id: int, name: str, hourly_drive_wage: str, hourly_load
 
 
 def update_vehicle(
-    vehicle_id: int, 
-    vehicle_name: str, 
-    mpg: str, 
+    vehicle_id: int,
+    vehicle_name: str,
+    mpg: str,
     capacity: str,
-    purchase_price: str = None, 
-    yearly_mileage: str = None, 
+    volume: str = None,
+    purchase_price: str = None,
+    yearly_mileage: str = None,
     salvage_value: str = None,
     insurance_cost: str = None,
     maintenance_cost: str = None,
@@ -324,6 +340,7 @@ def update_vehicle(
 ):
     try:
         cap_val = logic.parse_capacity_string(capacity)
+        vol_val = logic.parse_capacity_string(volume)
 
         update.update_vehicle_scoped(
             vehicle_id=vehicle_id,
@@ -335,7 +352,7 @@ def update_vehicle(
             annual_insurance_cost=logic.safe_float(insurance_cost),
             annual_maintenance_cost=logic.safe_float(maintenance_cost),
             max_weight_lbs=cap_val,
-            max_volume_cubic_ft=1000,
+            max_volume_cubic_ft=vol_val,
             storage_type=storage_type
         )
 
@@ -483,14 +500,15 @@ def get_route(route_id: int):
 
     header = result_sets[0][0]
     items = result_sets[1]
-    
-    manifest, costs = _calculate_route_internals(header, items)
+
+    manifest, costs, pricing = _calculate_route_internals(header, items)
 
     # Start with raw header data
     route_view = header.copy()
-    
+
     # Merge in calculated costs
     route_view.update(costs)
+    route_view["pricing"] = pricing
 
     # Frontend-specific aliases and formatting
     route_view.update({
@@ -575,6 +593,12 @@ def get_dashboard_data():
             r["sales_amount"] = base_sales + manifest_subtotal
             
             r["manifest_items"] = full_route.get("manifest", [])
+
+            pricing = full_route.get("pricing", {})
+            trip = pricing.get("trip", {})
+            r["net_trip_profit"] = trip.get("net_trip_profit", 0.0)
+        else:
+            r["net_trip_profit"] = 0.0
 
         # Resolve Vehicle Name
         vid = r.get("vehicle_id")

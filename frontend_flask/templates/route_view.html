@@ -148,25 +148,69 @@
              <div class="v">${{ "%.2f"|format(route.entered_revenue) }}</div>
              <div class="mini mt-4">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
              <div class="mini">Profit: ${{ "%.2f"|format(route.profit_est_entered) }}</div>
-             <div class="mini">Margin: {{ "%.1f"|format(route.margin_est_entered * 100) }}%</div>
+             <div class="mini">Margin: {{ "%.1f"|format(route.margin_est_entered) }}%</div>
            </div>
            <div>
              <div class="mini">Calculated Revenue</div>
              <div class="v">${{ "%.2f"|format(route.calculated_revenue) }}</div>
              <div class="mini mt-4">Total Cost: ${{ "%.2f"|format(route.total_cost) }}</div>
              <div class="mini">Profit: ${{ "%.2f"|format(route.profit_est_calculated) }}</div>
-             <div class="mini">Margin: {{ "%.1f"|format(route.margin_est_calculated * 100) }}%</div>
+             <div class="mini">Margin: {{ "%.1f"|format(route.margin_est_calculated) }}%</div>
            </div>
         </div>
       </div>
+
+      {% set trip = route.pricing.trip %}
+      <div class="border-top pt-12 text-center">
+        <div class="muted mb-6" style="font-size: 16px;">Trip Break-Even</div>
+        {% if trip.net_trip_profit >= 0 %}
+          <div class="surplus bold" style="font-size: 28px; line-height: 1.2;">
+            +${{ "%.2f"|format(trip.net_trip_profit) }}
+          </div>
+          <div class="mini mt-4">Net Trip Profit</div>
+          {% if trip.delivery_pct_of_margin is not none %}
+            <div class="hint mt-4">
+              Delivery consumes {{ "%.1f"|format(trip.delivery_pct_of_margin) }}% of total margin
+              (${{ "%.2f"|format(trip.delivery_cost) }} of ${{ "%.2f"|format(trip.total_margin) }})
+            </div>
+          {% endif %}
+        {% else %}
+          <div class="deficit bold" style="font-size: 28px; line-height: 1.2;">
+            &minus;${{ "%.2f"|format(trip.needs_more_margin) }}
+          </div>
+          <div class="mini mt-4">More Margin Needed to Cover Delivery</div>
+          <div class="hint mt-4">
+            Margin ${{ "%.2f"|format(trip.total_margin) }} &middot; Delivery ${{ "%.2f"|format(trip.delivery_cost) }} &middot; Net ${{ "%.2f"|format(trip.net_trip_profit) }}
+          </div>
+        {% endif %}
+      </div>
     </div>
 
-    
-
+    {% set margin_by_id = {} %}
+    {% for m in route.pricing.margin %}
+      {% set _ = margin_by_id.update({m.manifest_item_id: m}) %}
+    {% endfor %}
+    {% set alloc_by_weight = {} %}
+    {% for a in route.pricing.allocated_delivery.by_weight %}
+      {% set _ = alloc_by_weight.update({a.manifest_item_id: a}) %}
+    {% endfor %}
+    {% set alloc_by_volume = {} %}
+    {% for a in route.pricing.allocated_delivery.by_volume %}
+      {% set _ = alloc_by_volume.update({a.manifest_item_id: a}) %}
+    {% endfor %}
     <div class="card">
       <div class="flex flex-between items-center mb-10">
         <div class="k">Manifest</div>
-        <button class="btn small" id="btnManageLoad">Manage Load</button>
+        <div class="flex items-center gap-12">
+          <span class="mini">Allocate delivery by:</span>
+          <label class="mini" style="font-weight:600;cursor:pointer;">
+            <input type="radio" name="allocBasis" value="weight" checked> Weight
+          </label>
+          <label class="mini" style="font-weight:600;cursor:pointer;">
+            <input type="radio" name="allocBasis" value="volume"> Volume
+          </label>
+          <button class="btn small" id="btnManageLoad">Manage Load</button>
+        </div>
       </div>
       <table>
         <thead>
@@ -175,17 +219,25 @@
             <th>Qty</th>
             <th>Items/Unit</th>
             <th>Unit Price</th>
-            <th>Line Total</th>
+            <th>Cost / Item</th>
+            <th>Margin / Item</th>
+            <th>Line Revenue</th>
+            <th>Alloc. Delivery / Item</th>
+            <th>Break-even / Item</th>
+            <th>Line Margin</th>
           </tr>
         </thead>
         <tbody>
           {% if manifest|length == 0 %}
             <tr>
-              <td colspan="5" class="muted">No products on this route yet.</td>
+              <td colspan="10" class="muted">No products on this route yet.</td>
             </tr>
           {% endif %}
 
           {% for item in manifest %}
+          {% set mg = margin_by_id.get(item.manifest_item_id) %}
+          {% set aw = alloc_by_weight.get(item.manifest_item_id) %}
+          {% set av = alloc_by_volume.get(item.manifest_item_id) %}
           <tr>
             <td>{{ item.product_name }}</td>
             <td>{{ item.quantity }}</td>
@@ -197,7 +249,36 @@
                 —
               {% endif %}
             </td>
+            <td>
+              {% if item.cost_per_item is not none and item.cost_per_item != "" %}
+                ${{ "%.2f"|format(item.cost_per_item) }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td class="{% if mg and mg.margin_per_item is not none and mg.margin_per_item < 0 %}deficit{% elif mg and mg.margin_per_item is not none %}surplus{% endif %}">
+              {% if mg and mg.margin_per_item is not none %}
+                ${{ "%.2f"|format(mg.margin_per_item) }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
             <td>${{ "%.2f"|format(item.line_total) }}</td>
+            <td>
+              <span class="alloc-weight">{% if aw %}${{ "%.2f"|format(aw.allocated_per_item) }}{% else %}—{% endif %}</span>
+              <span class="alloc-volume" style="display:none;">{% if av %}${{ "%.2f"|format(av.allocated_per_item) }}{% else %}—{% endif %}</span>
+            </td>
+            <td>
+              <span class="alloc-weight">{% if aw and aw.breakeven_per_item is not none %}${{ "%.2f"|format(aw.breakeven_per_item) }}{% else %}—{% endif %}</span>
+              <span class="alloc-volume" style="display:none;">{% if av and av.breakeven_per_item is not none %}${{ "%.2f"|format(av.breakeven_per_item) }}{% else %}—{% endif %}</span>
+            </td>
+            <td class="{% if mg and mg.line_margin is not none and mg.line_margin < 0 %}deficit{% elif mg and mg.line_margin is not none %}surplus{% endif %}">
+              {% if mg and mg.line_margin is not none %}
+                ${{ "%.2f"|format(mg.line_margin) }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -249,6 +330,19 @@
 
     document.querySelectorAll("[data-open]").forEach(b => {
       b.addEventListener("click", () => openModal(b.dataset.open));
+    });
+
+    // Allocation basis toggle (weight vs volume) on the manifest table
+    document.querySelectorAll('input[name="allocBasis"]').forEach(r => {
+      r.addEventListener("change", () => {
+        const showVolume = r.value === "volume" && r.checked;
+        document.querySelectorAll(".alloc-weight").forEach(el => {
+          el.style.display = showVolume ? "none" : "";
+        });
+        document.querySelectorAll(".alloc-volume").forEach(el => {
+          el.style.display = showVolume ? "" : "none";
+        });
+      });
     });
 
     document.querySelectorAll("[data-close]").forEach(b => {
