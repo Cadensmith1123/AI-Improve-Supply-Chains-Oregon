@@ -9,6 +9,7 @@
 
 <body>
   <div class="wrap">
+    {% if g.is_anonymous %}{% include 'anonymous_banner.html' %}{% endif %}
     {% include 'header.html' %}
 
     <div class="top">
