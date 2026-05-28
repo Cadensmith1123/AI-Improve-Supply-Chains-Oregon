@@ -1,5 +1,6 @@
 import pytest
 import os
+import flask
 import mysql.connector
 import dotenv
 from decimal import Decimal
@@ -36,6 +37,18 @@ def connection():
     if conn:
         conn.close()
 
+@pytest.fixture(autouse=True)
+def tenant_g_context():
+    """
+    scenario_management functions resolve the active tenant from flask.g.
+    These DB-layer tests run outside any HTTP request, so we push a minimal
+    Flask app context and set g.tenant_id = 1 for the duration of each test.
+    """
+    app = flask.Flask(__name__)
+    with app.app_context():
+        flask.g.tenant_id = 1
+        yield
+
 @pytest.fixture(scope="function")
 def dependencies(connection):
     """
@@ -66,9 +79,10 @@ def dependencies(connection):
         "driver_id": driver_id
     }
 
-def get_trip_details_wrapper(tenant_id, scenario_id, conn=None):
-    """Helper to adapt get_complete_route_details to old get_trip_details format"""
-    result_sets = scenario_funcs.get_complete_route_details(tenant_id, scenario_id, conn=conn)
+def get_trip_details_wrapper(scenario_id, conn=None):
+    """Adapt get_complete_route_details (tenant resolved from flask.g) to the
+    header/items dict shape these tests assert against."""
+    result_sets = scenario_funcs.get_complete_route_details(scenario_id, conn=conn)
     if not result_sets or not result_sets[0]:
         return None
     return {
@@ -80,20 +94,19 @@ def test_create_scenario(connection, dependencies):
     deps = dependencies
 
     new_id = scenario_funcs.create_scenario(
-        tenant_id=1,
         route_id=deps['route_id'],
-        total_revenue=1500.50, 
+        total_revenue=1500.50,
         vehicle_id=deps['vehicle_id'],
         driver_id=deps['driver_id'],
         run_date="2026-06-01",
         current_gas_price=4.50,
         conn=connection
     )
-    
+
     assert new_id is not None
-    
+
     # Verify via get_trip_details
-    details = get_trip_details_wrapper(1, new_id, conn=connection)
+    details = get_trip_details_wrapper(new_id, conn=connection)
     assert details is not None
     assert details['header']['scenario_id'] == new_id
 
@@ -106,25 +119,23 @@ def test_update_scenario(connection, dependencies):
     
     # Create
     scenario_id = scenario_funcs.create_scenario(
-        tenant_id=1,
         route_id=deps['route_id'],
         total_revenue=1000.00,
         vehicle_id=deps['vehicle_id'],
         driver_id=deps['driver_id'],
-        conn=connection 
+        conn=connection
     )
-    
+
     # Update
     scenario_funcs.update_scenario(
-        1,
         scenario_id,
         total_revenue=2500.00,
         current_gas_price=5.25,
         conn=connection
     )
-    
+
     # Verify
-    details = get_trip_details_wrapper(1, scenario_id, conn=connection)
+    details = get_trip_details_wrapper(scenario_id, conn=connection)
     header = details['header']
     
     assert header['gas_price'] == Decimal('5.25') 
@@ -138,19 +149,17 @@ def test_add_manifest_items(connection, dependencies):
     
     # Create Scenario
     scenario_id = scenario_funcs.create_scenario(
-        tenant_id=1,
         route_id=deps['route_id'],
         total_revenue=5000.00,
         vehicle_id=deps['vehicle_id'],
         driver_id=deps['driver_id'],
         conn=connection
     )
-    
+
     # Add Item (No Supply/Demand IDs)
     random_name = ''.join(random.choices(string.ascii_uppercase, k=5))
-    
+
     scenario_funcs.add_manifest_items(
-        tenant_id=1,
         scenario_id=scenario_id,
         quantity_loaded=100,
         supply_id=None,
@@ -163,9 +172,9 @@ def test_add_manifest_items(connection, dependencies):
         unit_volume=10,
         conn=connection
     )
-    
+
     # Verify
-    details = get_trip_details_wrapper(1, scenario_id, conn=connection)
+    details = get_trip_details_wrapper(scenario_id, conn=connection)
     items = details['items']
     
     assert len(items) == 1
@@ -184,16 +193,15 @@ def test_delete_scenario(connection, dependencies):
     
     # Create
     scenario_id = scenario_funcs.create_scenario(
-        tenant_id=1,
         route_id=deps['route_id'],
         total_revenue=2000.00,
         vehicle_id=deps['vehicle_id'],
         driver_id=deps['driver_id'],
-        conn=connection 
+        conn=connection
     )
 
     # Add Item
-    manifest_id = scenario_funcs.add_manifest_items(1, scenario_id, "DeleteMe", 1, conn=connection)
+    manifest_id = scenario_funcs.add_manifest_items(scenario_id, "DeleteMe", 1, conn=connection)
     connection.commit()
 
     manifest_detail = read.view_manifest_items(1, ids=[manifest_id], conn=connection)
@@ -203,7 +211,7 @@ def test_delete_scenario(connection, dependencies):
     delete.delete_plan(1, scenario_id, conn=connection)
 
     # Verify Gone
-    details = get_trip_details_wrapper(1, scenario_id, conn=connection)
+    details = get_trip_details_wrapper(scenario_id, conn=connection)
 
     manifest_id_returned = read.view_manifest_items(1, ids=[manifest_id], conn=connection)
     assert manifest_id_returned == []

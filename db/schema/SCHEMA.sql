@@ -147,6 +147,11 @@ CREATE TABLE scenarios (
     actual_unload_minutes INT DEFAULT 0,
     snapshot_total_revenue DECIMAL(12, 2) DEFAULT 0.00,
 
+    snapshot_total_distance_miles DECIMAL(8,2) DEFAULT NULL,
+    snapshot_drive_minutes DECIMAL(8,2) DEFAULT NULL,
+    snapshot_origin_location_id INT DEFAULT NULL,
+    snapshot_dest_location_id INT DEFAULT NULL,
+
     PRIMARY KEY (tenant_id, scenario_id),
     KEY (scenario_id),
     FOREIGN KEY (tenant_id, route_id) REFERENCES routes(tenant_id, route_id),

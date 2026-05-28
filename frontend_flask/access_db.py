@@ -7,6 +7,7 @@ from db.functions.tenant_functions import (
 )
 import logic
 from db.functions import scenario_management
+from collections import defaultdict
 
 # =============================================================================
 # HELPERS
@@ -75,19 +76,62 @@ def _calculate_route_internals(header, items):
     }
     return manifest, costs, pricing
 
-def _calculate_vehicle_costs(vehicle_id, header):
+def _calculate_vehicle_costs(vehicle_id, header, scenario_id=None):
     """
-    Helper to calculate depreciation, insurance, and maintenance for a vehicle
-    based on the standard trip length.
-    Returns (depreciation, daily_insurance, daily_maintenance) or (None, None, None).
+    Returns (depreciation, daily_insurance, daily_maintenance) or
+    (None, None, None).  If scenario_id is supplied, mileage comes from
+    the snapshot when origin/dest haven't changed otherwise calls mapbox
     """
     if not vehicle_id:
         return None, None, None
     v = get_vehicle(vehicle_id)
     if not v:
         return None, None, None
-    miles, _ = logic.get_trip_length(header)
+    if scenario_id is not None:
+        miles, _ = _get_or_compute_trip_length(scenario_id, header)
+    else:
+        miles, _ = logic.get_trip_length(header)
     return logic.calculate_operating_costs(v, miles)
+
+
+def _get_or_compute_trip_length(scenario_id, header):
+    """
+    Returns (miles, drive_minutes).
+    Uses the snapshot when it's still valid (origin/dest unchanged);
+    falls back to Mapbox and persists the new snapshot otherwise.
+    """
+    rows = read.view_scenarios_scoped(
+        ids=scenario_id,
+        columns=[
+            "snapshot_total_distance_miles",
+            "snapshot_drive_minutes",
+            "snapshot_origin_location_id",
+            "snapshot_dest_location_id",
+        ],
+    )
+    snap = rows[0] if rows else {}
+    snap_miles = snap.get("snapshot_total_distance_miles")
+    snap_origin = snap.get("snapshot_origin_location_id")
+    snap_dest = snap.get("snapshot_dest_location_id")
+
+    if (snap_miles
+            and snap_origin == header.get("origin_location_id")
+            and snap_dest == header.get("dest_location_id")):
+        return (
+            float(snap_miles),
+            float(snap.get("snapshot_drive_minutes") or 0.0),
+        )
+
+    # Cache miss — call Mapbox once and persist for next time.
+    miles, minutes = logic.get_trip_length(header)
+    scenario_management.refresh_scenario_distance(
+        scenario_id=scenario_id,
+        miles=miles,
+        drive_minutes=minutes,
+        origin_location_id=header.get("origin_location_id"),
+        dest_location_id=header.get("dest_location_id"),
+    )
+    return miles, minutes
 
 
 CSV_EXPORT_COLUMNS = [
@@ -232,17 +276,14 @@ def get_vehicle(vehicle_id: int):
 
 
 def get_all_routes_raw():
-    # Use optimized fetch for all scenarios
-    scenarios = read.view_scenarios_scoped()
+    # Single round-trip via scenario_management.get_all_route_details.
+    result_sets = scenario_management.get_all_route_details()
+    headers_by_id, items_by_sid = _group_route_details(result_sets)
     out = []
-    for s in scenarios:
-        # Reuse the optimized complete fetch
-        result_sets = scenario_management.get_complete_route_details(s['scenario_id'])
-        if result_sets and result_sets[0]:
-            header = result_sets[0][0]
-            items = result_sets[1]
-            _, costs, _ = _calculate_route_internals(header, items)
-            out.append(costs)
+    for sid, header in headers_by_id.items():
+        items = items_by_sid.get(sid, [])
+        _, costs, _ = _calculate_route_internals(header, items)
+        out.append(costs)
     return out
 
 
@@ -356,15 +397,28 @@ def update_vehicle(
             storage_type=storage_type
         )
 
-        scenarios = read.view_scenarios_scoped()
+        # Pull only the three columns we actually need from the existing
+        # view_scenarios proc — no new SP, no new wrapper.  The `columns=`
+        # arg is already supported (read_procs.sql:81 dynamic SQL).
+        scenarios = read.view_scenarios_scoped(
+            columns=[
+                "scenario_id",
+                "vehicle_id",
+                "snapshot_total_distance_miles",
+            ],
+        )
+        v = get_vehicle(vehicle_id)
         for s in scenarios:
-            if s.get('vehicle_id') == vehicle_id:
-                sid = s.get('scenario_id')
-                result_sets = scenario_management.get_complete_route_details(sid)
-                if result_sets and result_sets[0]:
-                    header = result_sets[0][0]
-                    dep, ins, maint = _calculate_vehicle_costs(vehicle_id, header)
-                    scenario_management.refresh_scenario(sid, dep or 0.0, ins or 0.0, maint or 0.0)
+            if s.get('vehicle_id') != vehicle_id:
+                continue
+            sid = s.get('scenario_id')
+            # Origin/dest don't change in update_vehicle, so the snapshot
+            # mileage is still authoritative.  Skip the per-iteration
+            # get_complete_route_details fetch AND skip Mapbox entirely;
+            # compute operating costs from the snapshot.
+            miles = float(s.get('snapshot_total_distance_miles') or 0.0)
+            dep, ins, maint = logic.calculate_operating_costs(v, miles)
+            scenario_management.refresh_scenario(sid, dep or 0.0, ins or 0.0, maint or 0.0)
 
         return True, None
     except Exception as e:
@@ -542,74 +596,53 @@ def get_route(route_id: int):
     return route_view
 
 
-def get_dashboard_data():
-    """
-    Aggregates all data needed for the main routes dashboard.
-    Enriches routes with calculated costs, manifest items, and resolved names.
+def _group_route_details(result_sets):
+    """View-shaping helper: groups the raw bulk result sets by scenario."""
+    headers_by_id = {h["scenario_id"]: h for h in (result_sets[0] or [])}
+    items_by_sid = defaultdict(list)
+    for item in (result_sets[1] if len(result_sets) > 1 else []):
+        items_by_sid[item["scenario_id"]].append(item)
+    return headers_by_id, items_by_sid
 
-    Returns:
-        dict: A dictionary containing:
-            - "routes": List[dict] of route summaries with calculated costs.
-            - "locations": List[dict] of available locations.
-            - "vehicles": List[dict] of available vehicles.
-            - "products": List[dict] of available products.
-            - "drivers": List[dict] of available drivers.
-    """
-    routes = list_routes()
+
+def get_dashboard_data():
+    result_sets = scenario_management.get_all_route_details()
+    headers_by_id, items_by_sid = _group_route_details(result_sets)
     locations = list_locations()
     vehicles = list_vehicles()
     products = list_products()
     drivers = list_drivers()
 
     locations_map = {l["location_id"]: l["name"] for l in locations}
-    vehicles_map = {v["vehicle_id"]: v for v in vehicles}
 
-    for r in routes:
-        # Resolve Location Names
-        r["origin_name"] = locations_map.get(r["origin_location_id"], f"#{r['origin_location_id']}")
-        r["dest_name"] = locations_map.get(r["dest_location_id"], f"#{r['dest_location_id']}")
+    routes = []
+    for sid, header in headers_by_id.items():
+        items = items_by_sid.get(sid, [])
+        manifest, costs, pricing = _calculate_route_internals(header, items)
 
-        # Fetch full route details (costs, manifest)
-        # This calls get_route -> get_complete_route_details -> calculate_trip_costs
-        full_route = get_route(r["route_id"])
-        
-        r["total_cost"] = full_route.get("calc_total_cost", 0.0) if full_route else 0.0
-        r["manifest_items"] = []
-        r["fuel_cost"] = 0.0
-        r["depreciation_cost"] = 0.0
-        r["manifest_count"] = 0
-        r["item_revenue"] = 0.0
-
-        if full_route:
-            r["fuel_cost"] = full_route.get("fuel_cost", 0.0)
-            r["depreciation_cost"] = full_route.get("depreciation_cost", 0.0)
-            r["manifest_count"] = full_route.get("line_item_count", 0)
-            
-            manifest_subtotal = full_route.get("calculated_revenue", 0.0)
-            r["item_revenue"] = manifest_subtotal
-            
-            # Add item revenue to base sales amount
-            base_sales = r.get("sales_amount") or 0.0
-            r["sales_amount"] = base_sales + manifest_subtotal
-            
-            r["manifest_items"] = full_route.get("manifest", [])
-
-            pricing = full_route.get("pricing", {})
-            trip = pricing.get("trip", {})
-            r["net_trip_profit"] = trip.get("net_trip_profit", 0.0)
-        else:
-            r["net_trip_profit"] = 0.0
-
-        # Resolve Vehicle Name
-        vid = r.get("vehicle_id")
-        r["vehicle_name"] = vehicles_map.get(vid, {}).get("vehicle_name") if vid else None
+        view = _map_scenario_to_route_view(header, header)
+        view["origin_name"] = locations_map.get(header.get("origin_location_id"), f"#{header.get('origin_location_id')}")
+        view["dest_name"]   = locations_map.get(header.get("dest_location_id"), f"#{header.get('dest_location_id')}")
+        view["vehicle_name"] = header.get("vehicle_name")
+        view["driver_name"]  = header.get("driver_name")
+        view["total_cost"]   = costs.get("total_cost", 0.0)
+        view["fuel_cost"]    = costs.get("fuel_cost_est", 0.0)
+        view["depreciation_cost"] = costs.get("depreciation_cost_est", 0.0)
+        view["manifest_count"]   = len(manifest)
+        view["manifest_items"]   = manifest
+        view["item_revenue"]     = logic.safe_float(costs.get("calculated_revenue"))
+        # snapshot_total_revenue comes back as Decimal from MySQL; coerce
+        # before mixing with view["item_revenue"] (float).
+        view["sales_amount"]     = logic.safe_float(header.get("snapshot_total_revenue")) + view["item_revenue"]
+        view["net_trip_profit"]  = logic.safe_float(pricing.get("trip", {}).get("net_trip_profit"))
+        routes.append(view)
 
     return {
         "routes": routes,
         "locations": locations,
         "vehicles": vehicles,
         "products": products,
-        "drivers": drivers
+        "drivers": drivers,
     }
 
 def create_route(
@@ -651,7 +684,18 @@ def create_route(
             'dest_state': dest.get('state')
         }
 
-        depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id, header)
+        # Compute trip length ONCE; reuse for both cost calc and snapshot.
+        miles, minutes = logic.get_trip_length(header)
+
+        # Mimic _calculate_vehicle_costs's null-vehicle handling inline so
+        # we don't double-call Mapbox via the helper.
+        if vehicle_id:
+            v = get_vehicle(vehicle_id)
+            depreciation, daily_insurance, daily_maintenance = (
+                logic.calculate_operating_costs(v, miles) if v else (None, None, None)
+            )
+        else:
+            depreciation, daily_insurance, daily_maintenance = (None, None, None)
 
         scenario_id = scenario_management.create_scenario(
             route_id=real_route_id,
@@ -663,6 +707,16 @@ def create_route(
             daily_insurance=daily_insurance,
             daily_maintenance=daily_maintenance
         )
+
+        # Persist snapshot — same miles/minutes computed above.
+        scenario_management.refresh_scenario_distance(
+            scenario_id=scenario_id,
+            miles=miles,
+            drive_minutes=minutes,
+            origin_location_id=origin_location_id,
+            dest_location_id=dest_location_id,
+        )
+
         return True, None, scenario_id
     except Exception as e:
         return False, str(e), None
@@ -708,7 +762,7 @@ def update_route(
     # Use the new vehicle_id if provided, otherwise fall back to the existing one in the header
     effective_vehicle_id = vehicle_id if vehicle_id is not None else header.get('vehicle_id')
     
-    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(effective_vehicle_id, calc_header)
+    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(effective_vehicle_id, calc_header, scenario_id=route_id)
 
     try:
         scenario_management.update_scenario(
@@ -750,9 +804,9 @@ def recalculate_route_costs(route_id: int):
         vehicle_id = scenarios[0].get('vehicle_id')
         result_sets = scenario_management.get_complete_route_details(route_id)
         header = result_sets[0][0]
-        dep, ins, maint = _calculate_vehicle_costs(vehicle_id, header)
+        dep, ins, maint = _calculate_vehicle_costs(vehicle_id, header, scenario_id=route_id)
 
-        print(f"DEBUG dep={dep}, ins={ins}, maint={maint}") 
+        print(f"DEBUG dep={dep}, ins={ins}, maint={maint}")
 
         # If no vehicle, default costs to 0.0
         scenario_management.refresh_scenario(route_id, dep or 0.0, ins or 0.0, maint or 0.0)
@@ -768,7 +822,7 @@ def recalculate_route_costs(route_id: int):
 def assign_vehicle_to_route(route_id: int, vehicle_id: Optional[int]):
     result_sets = scenario_management.get_complete_route_details(route_id)
     header = result_sets[0][0]
-    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id, header)
+    depreciation, daily_insurance, daily_maintenance = _calculate_vehicle_costs(vehicle_id, header, scenario_id=route_id)
 
     try:
         scenario_management.update_scenario(

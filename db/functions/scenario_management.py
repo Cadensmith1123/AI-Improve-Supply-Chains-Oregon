@@ -201,6 +201,39 @@ def refresh_scenario(scenario_id, depreciation, daily_insurance, daily_maintenan
             conn.close()
 
 
+def refresh_scenario_distance(scenario_id, miles, drive_minutes,
+                              origin_location_id, dest_location_id,
+                              conn=None):
+    """
+    Persists Mapbox-derived (miles, minutes) plus the origin/dest IDs
+    used to compute them.  Subsequent reads compare against the live
+    route IDs to decide whether the snapshot is still authoritative.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db()
+        should_close = True
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
+
+    tenant_id = _get_tenant_id()
+    try:
+        cur = conn.cursor()
+        cur.callproc("refresh_scenario_distance", [
+            tenant_id,
+            _to_int(scenario_id),
+            _to_dec(miles),
+            _to_dec(drive_minutes),
+            _to_int(origin_location_id),
+            _to_int(dest_location_id),
+        ])
+        conn.commit()
+        cur.close()
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
 def add_manifest_items(
         scenario_id,
         item_name,
@@ -309,6 +342,35 @@ def get_complete_route_details(scenario_id, conn=None):
         result_sets = [r.fetchall() for r in cur.stored_results()]
         cur.close()
         
+        return result_sets
+    finally:
+        if should_close and conn:
+            conn.close()
+
+
+def get_all_route_details(conn=None):
+    """
+    Bulk variant of get_complete_route_details: returns every scenario
+    for the active tenant in a single call.
+
+    Returns result_sets — a 2-element list:
+      result_sets[0] -> headers (one row per scenario)
+      result_sets[1] -> manifest items (one row per item, keyed by scenario_id)
+    """
+    should_close = False
+    if conn is None:
+        conn = get_db()
+        should_close = True
+
+    if conn is None:
+        raise RuntimeError("Failed to connect to database")
+
+    tenant_id = _get_tenant_id()
+    try:
+        cur = conn.cursor(dictionary=True)
+        cur.callproc("get_all_route_details", [tenant_id])
+        result_sets = [r.fetchall() for r in cur.stored_results()]
+        cur.close()
         return result_sets
     finally:
         if should_close and conn:
