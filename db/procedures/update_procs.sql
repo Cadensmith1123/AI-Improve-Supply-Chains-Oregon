@@ -248,4 +248,23 @@ BEGIN
     WHERE manifest_item_id = p_manifest_item_id AND tenant_id = p_tenant_id;
 END $$
 
+DROP PROCEDURE IF EXISTS refresh_scenario_distance $$
+CREATE PROCEDURE refresh_scenario_distance(
+    IN p_tenant_id   INT,
+    IN p_scenario_id INT,
+    IN p_miles       DECIMAL(8,2),
+    IN p_minutes     DECIMAL(8,2),
+    IN p_origin_id   INT,
+    IN p_dest_id     INT
+)
+BEGIN
+    UPDATE scenarios
+       SET snapshot_total_distance_miles = p_miles,
+           snapshot_drive_minutes        = p_minutes,
+           snapshot_origin_location_id   = p_origin_id,
+           snapshot_dest_location_id     = p_dest_id
+     WHERE tenant_id   = p_tenant_id
+       AND scenario_id = p_scenario_id;
+END $$
+
 DELIMITER ;

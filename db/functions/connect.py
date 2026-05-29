@@ -36,7 +36,7 @@ def get_db():
         if _db_pool is None:
             _db_pool = pooling.MySQLConnectionPool(
                 pool_name="main_pool",
-                pool_size=5,
+                pool_size=int(os.getenv("DB_POOL_SIZE", 20)),
                 **db_config
             )
         return _db_pool.get_connection()
@@ -52,7 +52,7 @@ def get_auth_db():
         if _auth_db_pool is None:
             _auth_db_pool = pooling.MySQLConnectionPool(
                 pool_name="auth_pool",
-                pool_size=5,
+                pool_size=int(os.getenv("DB_POOL_SIZE", 20)),
                 **auth_db_config
             )
         return _auth_db_pool.get_connection()

@@ -13,6 +13,7 @@ Handles all validation and calculation logic.
 # HELPERS/PARSERS
 # =============================================================================
 
+
 def parse_optional_float(raw: str, field_key: str, errors: dict):
     raw = (raw or "").strip()
     if raw == "":
@@ -272,18 +273,30 @@ def fetch_mapbox_distance(origin_address, dest_address):
     return None, None
 
 
+class TripLengthError(RuntimeError):
+    pass
+
+
 def get_trip_length(header):
     """
     Returns trip distance (miles) and time (minutes).
+    Raises TripLengthError if Mapbox cannot resolve the addresses.
+    Callers that want the silent-zero behavior must opt in explicitly.
     """
-    dest_address = f"{header.get('dest_address_street')} {header.get('dest_city')} {header.get('dest_state')}"
-
-    origin_address = f"{header.get('origin_address_street')} {header.get('origin_city')} {header.get('origin_state')}"
+    origin_address = (
+        f"{header.get('origin_address_street')} "
+        f"{header.get('origin_city')} {header.get('origin_state')}"
+    )
+    dest_address = (
+        f"{header.get('dest_address_street')} "
+        f"{header.get('dest_city')} {header.get('dest_state')}"
+    )
     miles_est, time_est = fetch_mapbox_distance(origin_address, dest_address)
     if not miles_est or not time_est:
-        miles_est = 0.0
-        time_est = 0.0
-    return round(miles_est*2,2), round(time_est*2,2)
+        raise TripLengthError(
+            f"Mapbox failed for {origin_address!r} -> {dest_address!r}"
+        )
+    return round(miles_est * 2, 2), round(time_est * 2, 2)
 
 
 def calculate_depreciation(purchase_price, salvage_value, yearly_mileage, trip_miles):

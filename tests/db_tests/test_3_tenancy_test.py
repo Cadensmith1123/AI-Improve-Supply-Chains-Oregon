@@ -2,13 +2,14 @@ import pytest
 import os
 import mysql.connector
 import dotenv
+from datetime import date
 from decimal import Decimal
 from mysql.connector import errors as mysql_errors
 
 import db.functions.simple_functions.read as read
 import db.functions.simple_functions.create as create
+import db.functions.simple_functions.update as update
 import db.functions.simple_functions.delete as delete
-import db.functions.scenario_management as scenario_funcs
 
 dotenv.load_dotenv()
 
@@ -33,15 +34,32 @@ def connection():
     if conn:
         conn.close()
 
-def get_trip_details_wrapper(tenant_id, scenario_id, conn=None):
-    """Helper to adapt get_complete_route_details to old get_trip_details format"""
-    result_sets = scenario_funcs.get_complete_route_details(tenant_id, scenario_id, conn=conn)
-    if not result_sets or not result_sets[0]:
-        return None
-    return {
-        'header': result_sets[0][0],
-        'items': result_sets[1]
-    }
+def _to_int(x):
+    return int(x) if x not in (None, "") else None
+
+
+def _create_scenario(connection, tenant_id, route_id, total_revenue,
+                     vehicle_id=None, driver_id=None):
+    """
+    Create a scenario for an EXPLICIT tenant via the create_trip_header proc.
+
+    scenario_management.create_scenario() resolves the tenant from flask.g,
+    which is not available in these DB-layer tests, so we drive the underlying
+    proc directly with an explicit tenant_id (mirroring its argument list).
+    Returns the new scenario_id.
+    """
+    cur = connection.cursor()
+    args = [
+        tenant_id, int(route_id),
+        _to_int(vehicle_id), _to_int(driver_id), date.today(),
+        Decimal("0.0"), Decimal(str(total_revenue)),
+        Decimal("0.0"), Decimal("0.0"), Decimal("0.0"),
+        0,  # OUT p_new_scenario_id placeholder
+    ]
+    result = cur.callproc("create_trip_header", args)
+    connection.commit()
+    cur.close()
+    return result[-1]
 
 def test_location_isolation(connection):
     """
@@ -105,51 +123,35 @@ def test_product_isolation(connection):
     delete.delete_product_master(tenant_a, prod_code, conn=connection)
     connection.commit()
 
-def test_scenario_security(connection):
+def test_scenario_isolation(connection):
     """
-    Verify that Tenant B cannot view or update Tenant A's scenario.
+    Verify Tenant B can neither read nor delete Tenant A's scenario.
     """
     tenant_a = 1
     tenant_b = 2
-    
-    # 1. Setup minimal dependencies for Tenant A
-    loc1 = create.add_location(tenant_a, "Loc1", "Hub", "A", "C", "S", "Z", "P", 0, 0, 10, 10, conn=connection)
-    loc2 = create.add_location(tenant_a, "Loc2", "Store", "A", "C", "S", "Z", "P", 0, 0, 10, 10, conn=connection)
+
+    # 1. Setup minimal dependencies + scenario for Tenant A
+    loc1 = create.add_location(tenant_a, "Loc1", "Hub", "A", "C", "OR", "97000", "P", 0, 0, 10, 10, conn=connection)
+    loc2 = create.add_location(tenant_a, "Loc2", "Store", "A", "C", "OR", "97000", "P", 0, 0, 10, 10, conn=connection)
     route_a = create.add_route(tenant_a, "Route A", loc1, loc2, conn=connection)
     connection.commit()
-    
-    # 2. Create Scenario for Tenant A
-    scen_a = scenario_funcs.create_scenario(
-        tenant_id=tenant_a,
-        route_id=route_a,
-        total_revenue=100.00,
-        conn=connection
-    )
-    
-    # 3. Verify A sees scenario
-    details_a = get_trip_details_wrapper(tenant_a, scen_a, conn=connection)
-    assert details_a is not None
-    assert details_a['header']['scenario_id'] == scen_a
-    
-    # 4. Verify B does NOT see scenario (get_trip_details returns None)
-    details_b = get_trip_details_wrapper(tenant_b, scen_a, conn=connection)
-    assert details_b is None
-    
-    # 5. Attempt Update by B on A's scenario (Should fail/return None)
-    with pytest.raises(mysql_errors.DatabaseError) as excinfo:
-        scenario_funcs.update_scenario(
-            tenant_id=tenant_b,
-            scenario_id=scen_a,
-            total_revenue=9999.99,
-            conn=connection
-        )
-    assert "scenario_id not found" in str(excinfo.value)
-    
-    # 6. Verify A's data is unchanged
-    details_a_after = get_trip_details_wrapper(tenant_a, scen_a, conn=connection)
-    # Revenue should still be 100.00, not 9999.99
-    assert details_a_after['header']['entered_revenue'] == Decimal('100.00')
-    
+
+    scen_a = _create_scenario(connection, tenant_a, route_a, 100.00)
+
+    # 2. Tenant A sees its scenario
+    rows_a = read.view_scenarios(tenant_a, connection, ids=scen_a)
+    assert len(rows_a) == 1
+    assert rows_a[0]['scenario_id'] == scen_a
+
+    # 3. Tenant B does NOT see it
+    rows_b = read.view_scenarios(tenant_b, connection, ids=scen_a)
+    assert len(rows_b) == 0
+
+    # 4. Tenant B cannot delete A's scenario (scoped delete affects 0 rows)
+    delete.delete_plan(tenant_b, scen_a, conn=connection)
+    connection.commit()
+    assert len(read.view_scenarios(tenant_a, connection, ids=scen_a)) == 1
+
     # Cleanup
     delete.delete_plan(tenant_a, scen_a, conn=connection)
     delete.delete_route(tenant_a, route_a, conn=connection)
@@ -261,4 +263,133 @@ def test_supply_chain_isolation(connection):
     delete.delete_entity(tenant_a, ent_a, conn=connection)
     delete.delete_location(tenant_a, loc_a, conn=connection)
     delete.delete_product_master(tenant_a, prod_a, conn=connection)
+    connection.commit()
+
+
+def test_route_isolation(connection):
+    """
+    Test plan integration priority: create a route under Tenant A, query it
+    with Tenant B credentials -> assert empty result.
+    """
+    tenant_a = 1
+    tenant_b = 2
+
+    loc1 = create.add_location(tenant_a, "RouteIso Origin", "Hub", "St", "C", "OR", "97000", "P", 0, 0, 10, 10, conn=connection)
+    loc2 = create.add_location(tenant_a, "RouteIso Dest", "Store", "St", "C", "OR", "97000", "P", 0, 0, 10, 10, conn=connection)
+    route_a = create.add_route(tenant_a, "RouteIso A", loc1, loc2, conn=connection)
+    connection.commit()
+
+    # A sees its route
+    rows_a = read.view_routes(tenant_a, connection, ids=route_a)
+    assert len(rows_a) == 1
+    assert rows_a[0]['name'] == "RouteIso A"
+
+    # B sees nothing
+    rows_b = read.view_routes(tenant_b, connection, ids=route_a)
+    assert len(rows_b) == 0
+
+    # Cleanup
+    delete.delete_route(tenant_a, route_a, conn=connection)
+    delete.delete_location(tenant_a, loc1, conn=connection)
+    delete.delete_location(tenant_a, loc2, conn=connection)
+    connection.commit()
+
+
+def test_cross_tenant_update_is_silent_noop(connection):
+    """
+    Test plan (Multi-Tenant Data Isolation): writes must never cross tenant
+    boundaries. Each update proc filters WHERE id = ? AND tenant_id = ?, so a
+    write attempted by Tenant B against Tenant A's records affects zero rows
+    and raises no error. Verify A's data is left intact.
+    """
+    tenant_a = 1
+    tenant_b = 2
+
+    loc_a = create.add_location(tenant_a, "Orig Loc", "Hub", "St", "C", "OR", "97000", "555", 0, 0, 10, 10, conn=connection)
+    loc_a2 = create.add_location(tenant_a, "Orig Dest", "Store", "St", "C", "OR", "97000", "555", 0, 0, 10, 10, conn=connection)
+    drv_a = create.add_driver(tenant_a, "Orig Driver", 20.0, 15.0, conn=connection)
+    veh_a = create.add_vehicle(tenant_a, "Orig Truck", 10.0, 45000.00, 20000.00, 5000.00, 1000, 500, 10000, 1000, "Dry", conn=connection)
+    route_a = create.add_route(tenant_a, "Orig Route", loc_a, loc_a2, conn=connection)
+    connection.commit()
+
+    # Tenant B attempts to overwrite each of A's records (no exception expected).
+    update.update_location(tenant_b, loc_a, "HACKED", "Hub", "X", "X", "OR", "00000", "000", 1, 1, 99, 99, conn=connection)
+    update.update_driver(tenant_b, drv_a, "HACKED", 1.0, 1.0, conn=connection)
+    update.update_vehicle(tenant_b, veh_a, "HACKED", 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1, 1, "Dry", conn=connection)
+    update.update_route(tenant_b, route_a, "HACKED", loc_a, loc_a2, conn=connection)
+    connection.commit()
+
+    # A's data is unchanged.
+    assert read.view_locations(tenant_a, connection, ids=loc_a)[0]['name'] == "Orig Loc"
+    assert read.view_drivers(tenant_a, connection, ids=drv_a)[0]['name'] == "Orig Driver"
+    assert read.view_vehicles(tenant_a, connection, ids=veh_a)[0]['name'] == "Orig Truck"
+    assert read.view_routes(tenant_a, connection, ids=route_a)[0]['name'] == "Orig Route"
+
+    # Cleanup
+    delete.delete_route(tenant_a, route_a, conn=connection)
+    delete.delete_driver(tenant_a, drv_a, conn=connection)
+    delete.delete_vehicle(tenant_a, veh_a, conn=connection)
+    delete.delete_location(tenant_a, loc_a, conn=connection)
+    delete.delete_location(tenant_a, loc_a2, conn=connection)
+    connection.commit()
+
+
+def test_listing_does_not_leak_across_tenants(connection):
+    """
+    An unscoped 'view all' (no ids filter) must return only the caller's
+    tenant rows. Seed one location for A and one for B, then assert neither
+    tenant's full listing contains the other's id.
+    """
+    tenant_a = 1
+    tenant_b = 2
+
+    loc_a = create.add_location(tenant_a, "Leak Test A", "Hub", "St", "C", "OR", "97000", "555", 0, 0, 10, 10, conn=connection)
+    loc_b = create.add_location(tenant_b, "Leak Test B", "Hub", "St", "C", "OR", "97000", "555", 0, 0, 10, 10, conn=connection)
+    connection.commit()
+
+    a_ids = {r['location_id'] for r in read.view_locations(tenant_a, connection)}
+    b_ids = {r['location_id'] for r in read.view_locations(tenant_b, connection)}
+
+    assert loc_a in a_ids
+    assert loc_a not in b_ids
+    assert loc_b in b_ids
+    assert loc_b not in a_ids
+
+    # Cleanup
+    delete.delete_location(tenant_a, loc_a, conn=connection)
+    delete.delete_location(tenant_b, loc_b, conn=connection)
+    connection.commit()
+
+
+def test_manifest_item_isolation(connection):
+    """
+    Manifest items belonging to Tenant A's scenario must not be visible to
+    Tenant B, even when B requests the exact manifest_item_id.
+    """
+    tenant_a = 1
+    tenant_b = 2
+
+    loc1 = create.add_location(tenant_a, "Manifest Origin", "Hub", "St", "C", "OR", "97000", "P", 0, 0, 10, 10, conn=connection)
+    loc2 = create.add_location(tenant_a, "Manifest Dest", "Store", "St", "C", "OR", "97000", "P", 0, 0, 10, 10, conn=connection)
+    route_a = create.add_route(tenant_a, "Manifest Route", loc1, loc2, conn=connection)
+    connection.commit()
+
+    scen_a = _create_scenario(connection, tenant_a, route_a, 500.00)
+    mi_id = create.add_manifest_item(tenant_a, scen_a, "Secret Cargo", 10, conn=connection)
+    connection.commit()
+
+    # A sees the item
+    rows_a = read.view_manifest_items(tenant_a, ids=[mi_id], conn=connection)
+    assert len(rows_a) == 1
+    assert rows_a[0]['item_name'] == "Secret Cargo"
+
+    # B sees nothing
+    rows_b = read.view_manifest_items(tenant_b, ids=[mi_id], conn=connection)
+    assert len(rows_b) == 0
+
+    # Cleanup (delete_plan cascades to manifest items)
+    delete.delete_plan(tenant_a, scen_a, conn=connection)
+    delete.delete_route(tenant_a, route_a, conn=connection)
+    delete.delete_location(tenant_a, loc1, conn=connection)
+    delete.delete_location(tenant_a, loc2, conn=connection)
     connection.commit()
