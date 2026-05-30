@@ -7,6 +7,12 @@ import re
 
 dotenv.load_dotenv()
 
+"""
+Files in this folder are appended with a number after test
+to make sure they run in the correct order. 
+These number prefixes are required
+"""
+
 # List of SQL files to execute in order
 SQL_FILES = [
     r"db/schema/SCHEMA.sql",
